@@ -13,12 +13,11 @@ import warnings
 warnings.filterwarnings("ignore")
 from models.model_nb222.RIFE import Model
 
-input = r'E:\Blue Archive the Animation OP.mp4'
+input = r'E:\[Up to 21°C] 擅長逃跑的殿下 - 01 (Baha 1920x1080 AVC AAC MP4) [8236997B].mp4'
 save = r'D:\tmp\output'
 scale = 1.0
-times = 2  # 暂时锁定为倍帧
-half = True  # 是否使用半精度
-global_size = (1920, 1080)  # 全局图像尺寸
+exp = 3  # 补帧为2的exp次方倍率
+global_size = (960, 540)  # 全局图像尺寸
 scene_detection = True
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -31,12 +30,9 @@ model = Model()
 model.load_model(r'weights\train_log_nb222', -1)
 model.device()
 model.eval()
-if half:
-    model.half()
+
 
 def to_tensor(img):
-    if half:
-        return torch.from_numpy(img.transpose(2, 0, 1)).unsqueeze(0).half().cuda() / 255.
     return torch.from_numpy(img.transpose(2, 0, 1)).unsqueeze(0).float().cuda() / 255.
 
 
@@ -83,21 +79,24 @@ def clear_write_buffer(w_buffer):
         cv2.imwrite(os.path.join(save, "{:0>9d}.png".format(num)), cv2.resize(content, global_size))
 
 
+@torch.autocast(device_type="cuda")
 def make_inference(_I0, _I1, _I2, _scale):
-
-    if scene_detection:
-        # not implemented
-        pass
-        # if torch.abs(_I0 - _I1).mean() > 50 / 255. or torch.abs(_I1 - _I2).mean() > 50 / 255.:
-        #     _I0, _I1, _I2 = map(
-        #         lambda x: (x[0].cpu().float().numpy().transpose(1, 2, 0) * 255.).astype(np.uint8),
-        #         [_I0, _I1, _I2])
-        #     return _I0, _I0, _I1, _I1, _I2
-
     # 光流距离计算
     def distance_calculator(_x):
         u, v = _x[:, 0:1], _x[:, 1:]
         return torch.sqrt(u ** 2 + v ** 2)
+
+    def get_timesteps(seq, t, n):
+        for j in range(n):
+            iseq = [seq[i] + (seq[i + 1] - seq[i]) * t for i in range(0, len(seq) - 1)]
+            k = 0
+            while len(iseq):
+                seq.insert(2 * k + 1, iseq.pop(0))
+                k += 1
+
+        seq = [torch.round(s, decimals=4) for s in seq]
+
+        return seq[1:-1]
 
     reuse_i0i1 = model.reuse(_I0, _I1, scale)
     reuse_i1i2 = model.reuse(_I1, _I2, scale)
@@ -111,16 +110,40 @@ def make_inference(_I0, _I1, _I2, _scale):
     t = d10 / (d10 + d12)
     # t = torch.nn.functional.interpolate(t, size=_I0.shape[2:], mode='bilinear', align_corners=False)
 
-    t = t.half() if half else t
+    t0, t1 = t.clone(), t.clone()
+
+    if scene_detection:
+        left_scene = torch.abs(_I0 - _I1).mean() > 50 / 255.
+        right_scene = torch.abs(_I1 - _I2).mean() > 50 / 255.
+        if left_scene and right_scene:
+            t0 = torch.zeros_like(t0).cuda()
+            t1 = torch.zeros_like(t0).cuda()
+        if left_scene:
+            t0 = torch.zeros_like(t0).cuda()
+            t1 = torch.ones_like(t1).cuda() * 0.5
+        if right_scene:
+            t0 = torch.ones_like(t0).cuda() * 0.5
+            t1 = torch.zeros_like(t1).cuda()
 
     # 计算i0,i1的中间帧i01, ...
-    I01 = model.inference(_I0, _I1, reuse_i0i1, t)
-    I12 = model.inference(_I1, _I2, reuse_i1i2, t)
+    t0s = get_timesteps([torch.zeros_like(t0).cuda(), torch.ones_like(t0).cuda()], t0, exp)
+    t1s = get_timesteps([torch.zeros_like(t1).cuda(), torch.ones_like(t1).cuda()], t1, exp)
 
-    _I0, I01, _I1, I12, _I2 = map(lambda x: (x[0].cpu().float().numpy().transpose(1, 2, 0) * 255.).astype(np.uint8),
-                               [_I0, I01, _I1, I12, _I2])
+    I01s = []
+    I12s = []
+    for t0 in t0s:
+        I01 = model.inference(_I0, _I1, reuse_i0i1, t0)
+        I01s.append(I01)
+    for t1 in t1s:
+        I12 = model.inference(_I1, _I2, reuse_i1i2, t1)
+        I12s.append(I12)
 
-    return _I0, I01, _I1, I12, _I2
+    I01s = list(map(lambda x: (x[0].cpu().float().numpy().transpose(1, 2, 0) * 255.).astype(np.uint8), I01s))
+    I12s = list(map(lambda x: (x[0].cpu().float().numpy().transpose(1, 2, 0) * 255.).astype(np.uint8), I12s))
+    _I0, _I1, _I2 = map(lambda x: (x[0].cpu().float().numpy().transpose(1, 2, 0) * 255.).astype(np.uint8),
+                        [_I0, _I1, _I2])
+
+    return [_I0] + I01s + [_I1] + I12s + [_I2]
 
 
 video_capture = cv2.VideoCapture(input)
