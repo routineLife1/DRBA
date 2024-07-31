@@ -1,10 +1,5 @@
-# Fast Character Lossless Anime Video Frame Interpolation
-Using the characteristics of animation repetitive beats, avoid areas that are difficult to compensate. Add smooth to the background, also ensure that the characters are not damaged as much as possible.
-
-**Supported interpolation algorithms:**
-> Any vfi algorithm that can pass a timestep map of shape 1, 1, h, w and calc timestep map by an optical flow algorithm
-> 
-> The code and the following demo demonstrates the combination of RIFE + FastFlowNet (Suitable for real-time playback)
+# Distance Ratio Based Adjuster for Animeinterp
+This project serves as a control mechanism for Video Frame Interpolation (VFI) networks specifically tailored for anime. By calculating the DistanceRatioMap, it adjusts the frame interpolation strategies for spatiotemporally nonlinear and linear regions, thereby preserving the original pace of the characters and their integrity.
 
 # Demo
 
