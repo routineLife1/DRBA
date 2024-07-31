@@ -11,10 +11,10 @@ model.load_model(r'weights\train_log_nb222', -1)
 model.device()
 model.eval()
 
-iwh = (1920, 1088)  # 传入RIFE补帧网络的图片大小(cv2)
-owh = (1920, 1080)  # 最后输出的图片大小(cv2)
-scale = 1.0  # 光流尺度
-timestep = 1 / 3
+iwh = (1920, 1088)  # input resolution
+owh = (1920, 1080)  # output resolution
+scale = 1.0  # flow scale
+n = 3  # times
 # swap_thresh means Threshold for applying the swap mask.
 # 0 means fully apply the swap mask.
 # 0.n means enable swapping when the timestep difference is greater than 0.n.
@@ -22,7 +22,7 @@ timestep = 1 / 3
 swap_thresh = 0.5
 
 
-# 光流距离计算
+# calc distance by flow
 def distance_calculator(x):
     u, v = x[:, 0:1], x[:, 1:]
     return torch.sqrt(u ** 2 + v ** 2)
@@ -30,7 +30,6 @@ def distance_calculator(x):
 
 img0, img1, img2 = map(cv2.imread, ['input/01.png', 'input/02.png', 'input/03.png'])
 
-# RIFE用
 img0, img1, img2 = map(cv2.resize, [img0, img1, img2], [iwh] * 3)
 I0, I1, I2 = map(lambda x: torch.from_numpy(x.transpose(2, 0, 1)).unsqueeze(0).cuda().float() / 255.,
                  [img0, img1, img2])
@@ -42,8 +41,8 @@ flow10, metric10 = reuse_i1i0[0], reuse_i1i0[2]
 flow12, metric12 = reuse_i1i2[0], reuse_i1i0[2]
 
 # Compute the distance using the optical flow and distance calculator
-d10 = distance_calculator(flow10)
-d12 = distance_calculator(flow12)
+d10 = distance_calculator(flow10) + 1e-4
+d12 = distance_calculator(flow12) + 1e-4
 
 # Calculate the distance ratio map
 drm10 = d10 / (d10 + d12)
@@ -70,15 +69,29 @@ holes21 = warped_ones_mask21 < 0.999
 drm01[holes01] = (1 - drm10)[holes01]
 drm21[holes21] = (1 - drm12)[holes21]
 
-# Adjust timestep parameters for interpolation between frames I0, I1, and I2
-# The drm values range from [0, 1], so scale the timestep values for interpolation between I0 and I1 by a factor of 2
-I10 = model.inference_t2(I1, I0, reuse_i1i0, timestep0=(timestep * 2) * (1 - drm10),
-                         timestep1=1 - (timestep * 2) * drm01, swap_thresh=swap_thresh)
-I12 = model.inference_t2(I1, I2, reuse_i1i2, timestep0=(timestep * 2) * (1 - drm12),
-                         timestep1=1 - (timestep * 2) * drm21, swap_thresh=swap_thresh)
+output1, output2 = list(), list()
+output = list()
+if n % 2:
+    for i in range((n - 1) // 2):
+        t = (i + 1) / n
+        # Adjust timestep parameters for interpolation between frames I0, I1, and I2
+        # The drm values range from [0, 1], so scale the timestep values for interpolation between I0 and I1 by a factor of 2
+        output1.append(model.inference_t2(I1, I0, reuse_i1i0, timestep0=(t * 2) * (1 - drm10),
+                                          timestep1=1 - (t * 2) * drm01, swap_thresh=swap_thresh))
+        output2.append(model.inference_t2(I1, I2, reuse_i1i2, timestep0=(t * 2) * (1 - drm12),
+                                          timestep1=1 - (t * 2) * drm21, swap_thresh=swap_thresh))
+        output = list(reversed(output1)) + [I1] + output2
+else:
+    for i in range(n // 2):
+        t = (i + 0.5) / n
+        output1.append(model.inference_t2(I1, I0, reuse_i1i0, timestep0=(t * 2) * (1 - drm10),
+                                          timestep1=1 - (t * 2) * drm01, swap_thresh=swap_thresh))
+        output2.append(model.inference_t2(I1, I2, reuse_i1i2, timestep0=(t * 2) * (1 - drm12),
+                                          timestep1=1 - (t * 2) * drm21, swap_thresh=swap_thresh))
+        output = list(reversed(output1)) + output2
 
 cnt = 0
-for item in [I10, I12]:
+for out in output:
     cv2.imwrite(f'output/{cnt:03d}.png',
-                cv2.resize((item[0].cpu().float().numpy().transpose(1, 2, 0) * 255.).astype(np.uint8), owh))
+                cv2.resize((out[0].cpu().float().numpy().transpose(1, 2, 0) * 255.).astype(np.uint8), owh))
     cnt += 1
