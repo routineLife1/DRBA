@@ -12,11 +12,11 @@ from models.model_nb222.softsplat import softsplat as warp
 warnings.filterwarnings("ignore")
 from models.model_nb222.RIFE import Model
 
-input = r'E:\[Up to 21°C] 敗北女角太多了！ - 03 (Baha 1920x1080 AVC AAC MP4) [F933FE40].mp4'
+input = r'E:\test.mp4'
 save = r'D:\tmp\output'
 scale = 1.0
-times = 5  # 补帧倍数(必须是整数倍)
-global_size = (960, 540)  # 全局图像尺寸
+times = 5  # Must be an integer multiple
+global_size = (960, 540)  # frame processing resolution
 # swap_thresh means Threshold for applying the swap mask.
 # 0 means fully apply the swap mask.
 # 0.n means enable swapping when the timestep difference is greater than 0.n.
@@ -39,7 +39,6 @@ def to_tensor(img):
     return torch.from_numpy(img.transpose(2, 0, 1)).unsqueeze(0).float().cuda() / 255.
 
 
-# 加载图像
 def load_image(img, _scale):
     h, w, _ = img.shape
     while h * _scale % 64 != 0:
@@ -51,16 +50,16 @@ def load_image(img, _scale):
     return img
 
 
-output_counter = 0  # 输出计数器
+output_counter = 0
 
 
-def put(things):  # 将输出帧推送至write_buffer
+def put(things): 
     global output_counter
     output_counter += 1
     write_buffer.put([output_counter, things])
 
 
-def get():  # 获取输入帧
+def get():
     return read_buffer.get()
 
 
@@ -183,7 +182,7 @@ while True:
     I0, I1 = I1, I2
     pbar.update(1)
 
-# tail(结束时i0,i1已经移动到-2,-1帧的位置)
+# tail(At the end, i0 and i1 have moved to the positions of index -2 and -1 frames.)
 output = make_inference(I0, I1, I1, scale)
 for x in output:
     put(x)
