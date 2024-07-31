@@ -1,7 +1,7 @@
 # Distance Ratio Based Adjuster for Animeinterp
-> This project serves as a control mechanism for Video Frame Interpolation (VFI) networks specifically tailored for anime.
+> **Abstract：** This project serves as a control mechanism for Video Frame Interpolation (VFI) networks specifically tailored for anime.
 > By calculating the DistanceRatioMap, it adjusts the frame interpolation strategies for spatiotemporally nonlinear and linear regions,
-> thereby preserving the original pace of the characters and their integrity.
+> thereby preserving the original pace and integrity of the characters while avoiding distortions common in frame interpolation.
 
 # Demo
 
