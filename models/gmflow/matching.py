@@ -14,6 +14,8 @@ def global_correlation_softmax(feature0, feature1,
 
     correlation = torch.matmul(feature0, feature1).view(b, h, w, h, w) / (c ** 0.5)  # [B, H, W, H, W]
 
+    return_corr = correlation.clone()
+
     # flow from softmax
     init_grid = coords_grid(b, h, w, device=correlation.device, dtype=feature0.dtype)  # [B, 2, H, W]
     grid = init_grid.view(b, 2, -1).permute(0, 2, 1)  # [B, H*W, 2]
@@ -33,7 +35,7 @@ def global_correlation_softmax(feature0, feature1,
     # when predicting bidirectional flow, flow is the concatenation of forward flow and backward flow
     flow = correspondence - init_grid
 
-    return flow, prob
+    return flow, return_corr
 
 
 def local_correlation_softmax(feature0, feature1, local_radius,
@@ -68,6 +70,9 @@ def local_correlation_softmax(feature0, feature1, local_radius,
     feature0_view = feature0.permute(0, 2, 3, 1).view(b, h * w, 1, c)  # [B, H*W, 1, C]
 
     corr = torch.matmul(feature0_view, window_feature).view(b, h * w, -1) / (c ** 0.5)  # [B, H*W, (2R+1)^2]
+
+    # corr = torch.matmul(feature0_view, window_feature).view(b, h, w, -1) / (c ** 0.5)
+    # corr = corr.view(b, h * w, -1)  # [B, H*W, (2R+1)^2]
 
     # mask invalid locations
     # corr[~valid] = -1e9 if feature0.dtype == torch.float32 else -1e4
