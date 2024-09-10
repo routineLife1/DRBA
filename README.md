@@ -11,6 +11,16 @@
 
 **Coming soon.**
 
+## 🔧Dependencies
+**Set up the environment for the following repository**
+- [Practical-RIFE](https://github.com/hzwer/Practical-RIFE)
+- [FastFlowNet](https://github.com/ltkong218/FastFlowNet)
+- [GMFSS](https://github.com/98mxr/GMFSS_Fortuna)
+
+## ⚡Usage 
+
+**Coming soon.**
+
 # 📖Version Comparison
 
 ## gmfss(For learning and reference only.)
