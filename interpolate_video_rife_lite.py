@@ -72,7 +72,6 @@ def to_tensor(img):
     return torch.from_numpy(img.transpose(2, 0, 1)).unsqueeze(0).float().cuda() / 255.
 
 
-# 加载图像
 def load_image(img, _scale):
     h, w, _ = img.shape
     while h * _scale % 64 != 0:
@@ -135,6 +134,8 @@ def make_inference(_I0, _I1, _I2, _scale):
         u, v = _x[:, 0:1], _x[:, 1:]
         return torch.sqrt(u ** 2 + v ** 2)
 
+    # When using FastFlowNet to calculate optical flow, the input image size is uniformly reduced to half of the original size.
+    # FastFlowNet requires the input image dimensions to be divisible by 64.
     I0f, I1f, I2f = map(
         lambda x: torch.nn.functional.interpolate(x, size=(576, 1024), mode='bilinear', align_corners=False),
         [_I0, _I1, _I2])
