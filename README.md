@@ -7,17 +7,11 @@
 > thereby preserving the original pace and integrity of the characters while avoiding distortions common in frame
 > interpolation.
 
-# Demo
+# 👀Demos Videos
 
-## input
+**Coming soon.**
 
-![input](https://github.com/hyw-dev/FCLAFI/assets/68835291/cc9fb083-0f8d-48e1-b33e-0a893f313329)
-
-## output
-
-![output](https://github.com/hyw-dev/FCLAFI/assets/68835291/5138f267-6904-42ce-9551-b0891812a650)
-
-# Version Comparison
+# 📖Version Comparison
 
 ## gmfss(For learning and reference only.)
 
@@ -36,7 +30,3 @@ achieved on a reasonably powerful NVIDIA GPU, such as the RTX 3070.**
 **Combining the strengths of both RIFE and GMFSS, it delivers outstanding results.**
 
 ![gmfss](https://github.com/user-attachments/assets/5a4ca540-ddfa-4a93-ab21-e39eb9299e89)
-
-# Demos Videos
-
-**Coming soon.**
