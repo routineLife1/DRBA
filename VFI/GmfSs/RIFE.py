@@ -56,7 +56,7 @@ class Model(RIFEAnyTimeModelBase):
                 return param
 
         if rank <= 0:
-            self.flownet.load_state_dict(torch.load('{}/flownet.pkl'.format(path)))
+            self.flownet.load_state_dict(torch.load('{}/rife.pkl'.format(path)))
             self.metricnet.load_state_dict(convert(torch.load('{}/metric.pkl'.format(path))))
             self.fusionnet.load_state_dict(convert(torch.load('{}/fusionnet.pkl'.format(path))))
 
