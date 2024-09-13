@@ -241,7 +241,7 @@ idx = -1
 def calc_t(_last: np.ndarray, _idx: int):
     ori_timestamp = np.array(t_mapper.get_range_timestamps(_idx, _idx + 1, lclose=False, rclose=True, normalize=False))
     timestamp = ori_timestamp + offset
-    vfi_timestamp = np.round(timestamp - (_idx + 1), 4)  # head只需要大于等于0的部分, tail只需要小于等于0的部分
+    vfi_timestamp = np.round(timestamp - (_idx + 1), 4)
 
     vfi_timestamp = np.concatenate((_last, vfi_timestamp))
     _last = vfi_timestamp[vfi_timestamp > 0.5] - 1
