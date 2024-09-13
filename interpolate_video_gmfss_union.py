@@ -224,7 +224,7 @@ i0, i1 = get(), get()
 I0, I1 = load_image(i0, scale), load_image(i1, scale)
 
 # head
-output = make_inference(I0, I1, I1, scale)
+output = make_inference(I0, I0, I1, scale)
 for x in output:
     put(x)
 pbar.update(1)

@@ -1,4 +1,5 @@
-# for study only
+# for high quality output
+import math
 import subprocess
 from queue import Queue
 import cv2
@@ -7,26 +8,37 @@ from tqdm import tqdm
 import torch
 import numpy as np
 import time
-from models.model_nb222.GMFSS import Model
 from models.model_nb222.softsplat import softsplat as warp
+from models.model_pg104.GMFSS import Model
+from models.rife_422_lite.IFNet_HDv3 import IFNet
 import warnings
 
 warnings.filterwarnings("ignore")
 
-input = r'E:\test.mp4'  # input video path
+input = r'E:\01.mkv'  # input video path
 output = r'D:\tmp\output.mkv'  # output video path
 scale = 1.0  # flow scale
-times = 5  # Must be an integer multiple
+dst_fps = 60  # target fps (at least greater than source video fps)
 global_size = (1920, 1080)  # frame output resolution
 hwaccel = True  # Use hardware acceleration video encoder
 
 
-# deprecated
-# swap_thresh means Threshold for applying the swap mask.
-# 0 means fully apply the swap mask.
-# 0.n means enable swapping when the timestep difference is greater than 0.n.
-# 1 means never apply the swap mask.
-# swap_thresh = 1
+class TMapper:
+    def __init__(self, src=-1., dst=0., times=None):
+        self.times = dst / src if times is None else times
+        self.now_step = -1
+
+    def get_range_timestamps(self, _min: float, _max: float, lclose=True, rclose=False, normalize=True) -> list:
+        _min_step = math.ceil(_min * self.times)
+        _max_step = math.ceil(_max * self.times)
+        _start = _min_step if lclose else _min_step + 1
+        _end = _max_step if not rclose else _max_step + 1
+        if _start >= _end:
+            return []
+        if normalize:
+            return [((_i / self.times) - _min) / (_max - _min) for _i in range(_start, _end)]
+        return [_i / self.times for _i in range(_start, _end)]
+
 
 def generate_frame_renderer(input_path, output_path):
     video_capture = cv2.VideoCapture(input_path)
@@ -37,7 +49,7 @@ def generate_frame_renderer(input_path, output_path):
         encoder = 'h264_nvenc'
         preset = 'p7'
     ffmpeg_cmd = [
-        'ffmpeg', '-y', '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-r', f'{read_fps * times}',
+        'ffmpeg', '-y', '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-r', f'{dst_fps}',
         '-s', f'{global_size[0]}x{global_size[1]}',
         '-i', 'pipe:0', '-i', input_path,
         '-map', '0:v', '-map', '1:a',
@@ -56,8 +68,19 @@ if torch.cuda.is_available():
     torch.backends.cudnn.enabled = True
     torch.backends.cudnn.benchmark = True
 
+
+def convert(param):
+    return {
+        k.replace("module.", ""): v
+        for k, v in param.items()
+        if "module." in k
+    }
+
+
+ifnet = IFNet().cuda().eval()
+ifnet.load_state_dict(convert(torch.load(r'weights\rife.pkl', map_location='cpu')), False)
 model = Model()
-model.load_model(r'weights\train_log_nb222', -1)
+model.load_model(r'weights\train_log_pg104', -1)
 model.device()
 model.eval()
 
@@ -106,7 +129,7 @@ def clear_write_buffer(w_buffer):
 
 
 @torch.autocast(device_type="cuda")
-def make_inference(_I0, _I1, _I2, _scale):
+def make_inference(_I0, _I1, _I2, minus_t, zero_t, plus_t, _scale):
     # Flow distance calculator
     def distance_calculator(_x):
         u, v = _x[:, 0:1], _x[:, 1:]
@@ -119,8 +142,8 @@ def make_inference(_I0, _I1, _I2, _scale):
     flow12, metric12 = reuse_i1i2[0], reuse_i1i0[2]
 
     # Compute the distance using the optical flow and distance calculator
-    d10 = distance_calculator(flow10)
-    d12 = distance_calculator(flow12)
+    d10 = distance_calculator(flow10) + 1e-4
+    d12 = distance_calculator(flow12) + 1e-4
 
     # Calculate the distance ratio map
     drm10 = d10 / (d10 + d12)
@@ -147,33 +170,52 @@ def make_inference(_I0, _I1, _I2, _scale):
     drm01[holes01] = (1 - drm10)[holes01]
     drm21[holes21] = (1 - drm12)[holes21]
 
-    output1, output2 = list(), list()
-    _output = list()
-    if times % 2:
-        for i in range((times - 1) // 2):
-            t = (i + 1) / times
-            # Adjust timestep parameters for interpolation between frames I0, I1, and I2
-            # The drm values range from [0, 1], so scale the timestep values for interpolation between I0 and I1 by a factor of 2
-            output1.append(model.inference_t2(_I1, _I0, reuse_i1i0, timestep0=(t * 2) * (1 - drm10),
-                                              timestep1=1 - (t * 2) * drm01))
-            output2.append(model.inference_t2(_I1, _I2, reuse_i1i2, timestep0=(t * 2) * (1 - drm12),
-                                              timestep1=1 - (t * 2) * drm21))
-        _output = list(reversed(output1)) + [_I1] + output2
-    else:
-        for i in range(times // 2):
-            t = (i + 0.5) / times
-            output1.append(model.inference_t2(_I1, _I0, reuse_i1i0, timestep0=(t * 2) * (1 - drm10),
-                                              timestep1=1 - (t * 2) * drm01))
-            output2.append(model.inference_t2(_I1, _I2, reuse_i1i2, timestep0=(t * 2) * (1 - drm12),
-                                              timestep1=1 - (t * 2) * drm21))
-        _output = list(reversed(output1)) + output2
+    def calc_drm_rife(_t):
+        # For RIFE, drm should be aligned with the time corresponding to the intermediate frame.
+        drm01r = warp(1 - drm10, flow10 * (1 - drm10) * _t * 2, metric10, strMode='soft')
+        drm21r = warp(1 - drm12, flow12 * (1 - drm12) * _t * 2, metric12, strMode='soft')
 
+        warped_ones_mask01r = warp(ones_mask, flow10 * (1 - drm01r) * _t * 2, metric10, strMode='soft')
+        warped_ones_mask21r = warp(ones_mask, flow12 * (1 - drm21r) * _t * 2, metric12, strMode='soft')
+
+        holes01r = warped_ones_mask01r < 0.999
+        holes21r = warped_ones_mask21r < 0.999
+
+        drm01r[holes01r] = (1 - drm10)[holes01r]
+        drm21r[holes21r] = (1 - drm12)[holes21r]
+
+        return drm01r, drm21r
+
+    f_I0, f_I1, f_I2 = map(lambda x: torch.nn.functional.interpolate(x, scale_factor=0.5, mode='bilinear',
+                                                                     align_corners=False), [_I0, _I1, _I2])
+
+    output1, output2 = list(), list()
+
+    for t in minus_t:
+        t = -t
+        drm01r, drm21r = calc_drm_rife(t)
+        I10 = ifnet(torch.cat((f_I1, f_I0), 1), timestep=(t * 2 * drm01r),
+                    scale_list=[8 / scale, 4 / scale, 2 / scale, 1 / scale])
+        output1.append(model.inference_t2(_I1, _I0, reuse_i1i0, timestep0=(t * 2) * (1 - drm10),
+                                          timestep1=1 - (t * 2) * drm01, rife=I10))
+    for _ in zero_t:
+        output1.append(_I1)
+    for t in plus_t:
+        drm01r, drm21r = calc_drm_rife(t)
+        I12 = ifnet(torch.cat((f_I1, f_I2), 1), timestep=(t * 2 * drm21r),
+                    scale_list=[8 / scale, 4 / scale, 2 / scale, 1 / scale])
+        output2.append(model.inference_t2(_I1, _I2, reuse_i1i2, timestep0=(t * 2) * (1 - drm12),
+                                          timestep1=1 - (t * 2) * drm21, rife=I12))
+
+    _output = output1 + output2
     _output = map(lambda x: (x[0].cpu().float().numpy().transpose(1, 2, 0) * 255.).astype(np.uint8), _output)
 
     return _output
 
 
 video_capture = cv2.VideoCapture(input)
+src_fps = video_capture.get(cv2.CAP_PROP_FPS)
+assert dst_fps > src_fps, 'dst fps should be greater than src fps'
 total_frames_count = video_capture.get(7)
 pbar = tqdm(total=total_frames_count)
 read_buffer = Queue(maxsize=100)
@@ -185,8 +227,29 @@ _thread.start_new_thread(clear_write_buffer, (write_buffer,))
 i0, i1 = get(), get()
 I0, I1 = load_image(i0, scale), load_image(i1, scale)
 
+offset = (dst_fps - src_fps) / dst_fps / 2
+t_mapper = TMapper(src_fps, dst_fps)
+idx = -1
+
+
+def calc_t(_last: np.ndarray, _idx: int):
+    ori_timestamp = np.array(t_mapper.get_range_timestamps(_idx, _idx + 1, lclose=False, rclose=True, normalize=False))
+    timestamp = ori_timestamp + offset
+    vfi_timestamp = np.round(timestamp - (_idx + 1), 4)  # head只需要大于等于0的部分, tail只需要小于等于0的部分
+
+    vfi_timestamp = np.concatenate((_last, vfi_timestamp))
+    _last = vfi_timestamp[vfi_timestamp > 0.5] - 1
+    vfi_timestamp = vfi_timestamp[vfi_timestamp <= 0.5]
+
+    minus_t = vfi_timestamp[vfi_timestamp < 0]
+    zero_t = vfi_timestamp[vfi_timestamp == 0]
+    plus_t = vfi_timestamp[vfi_timestamp > 0]
+    return minus_t, zero_t, plus_t, _last
+
+
 # head
-output = make_inference(I0, I0, I1, scale)
+mt, zt, pt, last = calc_t(np.array([]), idx)
+output = make_inference(I0, I0, I1, mt, zt, pt, scale)
 for x in output:
     put(x)
 pbar.update(1)
@@ -197,7 +260,8 @@ while True:
         break
     I2 = load_image(i2, scale)
 
-    output = make_inference(I0, I1, I2, scale)
+    mt, zt, pt, last = calc_t(last, idx)
+    output = make_inference(I0, I1, I2, mt, zt, pt, scale)
     for x in output:
         put(x)
 
@@ -206,7 +270,8 @@ while True:
     pbar.update(1)
 
 # tail(At the end, i0 and i1 have moved to the positions of index -2 and -1 frames.)
-output = make_inference(I0, I1, I1, scale)
+mt, zt, pt, last = calc_t(last, idx)
+output = make_inference(I0, I1, I1, mt, zt, pt, scale)
 for x in output:
     put(x)
 pbar.update(1)
