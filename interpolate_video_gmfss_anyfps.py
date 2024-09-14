@@ -47,8 +47,6 @@ class TMapper:
 
 
 def generate_frame_renderer(input_path, output_path):
-    video_capture = cv2.VideoCapture(input_path)
-    read_fps = video_capture.get(cv2.CAP_PROP_FPS)
     encoder = 'libx264'
     preset = 'medium'
     if hwaccel:
@@ -237,6 +235,7 @@ while True:
 
     i0, i1 = i1, i2
     I0, I1 = I1, I2
+    idx += 1
     pbar.update(1)
 
 # tail(At the end, i0 and i1 have moved to the positions of index -2 and -1 frames.)
