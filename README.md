@@ -7,6 +7,13 @@
 > thereby preserving the original pace and integrity of the characters while avoiding distortions common in frame
 > interpolation.
 
+# 👀Demo
+
+## input
+![input](https://github.com/hyw-dev/FCLAFI/assets/68835291/cc9fb083-0f8d-48e1-b33e-0a893f313329)
+## output
+![output](https://github.com/hyw-dev/FCLAFI/assets/68835291/5138f267-6904-42ce-9551-b0891812a650)
+
 # 👀Demos Videos
 
 **Coming soon.**
