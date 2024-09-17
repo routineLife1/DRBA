@@ -167,13 +167,13 @@ def make_inference(_I0, _I1, _I2, minus_t, zero_t, plus_t, _scale):
 
     for t in minus_t:
         t = -t
-        output1.append(model.inference_t2(_I1, _I0, reuse_i1i0, timestep0=(t * 2) * (1 - drm10),
-                                          timestep1=1 - (t * 2) * drm01))
+        output1.append(model.inference_t2(_I1, _I0, reuse_i1i0, timestep0=t * (2 * (1 - drm10)),
+                                          timestep1=1 - t * (2 * drm01)))
     for _ in zero_t:
         output1.append(_I1)
     for t in plus_t:
-        output2.append(model.inference_t2(_I1, _I2, reuse_i1i2, timestep0=(t * 2) * (1 - drm12),
-                                          timestep1=1 - (t * 2) * drm21))
+        output2.append(model.inference_t2(_I1, _I2, reuse_i1i2, timestep0=t * (2 * (1 - drm12)),
+                                          timestep1=1 - t * (2 * drm21)))
 
     _output = output1 + output2
     _output = map(lambda x: (x[0].cpu().float().numpy().transpose(1, 2, 0) * 255.).astype(np.uint8), _output)

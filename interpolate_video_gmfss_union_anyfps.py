@@ -170,19 +170,19 @@ def make_inference(_I0, _I1, _I2, minus_t, zero_t, plus_t, _scale):
 
     def calc_drm_rife(_t):
         # For RIFE, drm should be aligned with the time corresponding to the intermediate frame.
-        drm01r = warp(1 - drm10, flow10 * (1 - drm10) * _t * 2, metric10, strMode='soft')
-        drm21r = warp(1 - drm12, flow12 * (1 - drm12) * _t * 2, metric12, strMode='soft')
+        _drm01r = warp(1 - drm10, flow10 * ((1 - drm10) * 2) * _t, metric10, strMode='soft')
+        _drm21r = warp(1 - drm12, flow12 * ((1 - drm12) * 2) * _t, metric12, strMode='soft')
 
-        warped_ones_mask01r = warp(ones_mask, flow10 * (1 - drm01r) * _t * 2, metric10, strMode='soft')
-        warped_ones_mask21r = warp(ones_mask, flow12 * (1 - drm21r) * _t * 2, metric12, strMode='soft')
+        warped_ones_mask01r = warp(ones_mask, flow10 * ((1 - _drm01r) * 2) * _t, metric10, strMode='soft')
+        warped_ones_mask21r = warp(ones_mask, flow12 * ((1 - _drm21r) * 2) * _t, metric12, strMode='soft')
 
         holes01r = warped_ones_mask01r < 0.999
         holes21r = warped_ones_mask21r < 0.999
 
-        drm01r[holes01r] = (1 - drm10)[holes01r]
-        drm21r[holes21r] = (1 - drm12)[holes21r]
+        _drm01r[holes01r] = (1 - drm10)[holes01r]
+        _drm21r[holes21r] = (1 - drm12)[holes21r]
 
-        return drm01r, drm21r
+        return _drm01r, _drm21r
 
     f_I0, f_I1, f_I2 = map(lambda x: torch.nn.functional.interpolate(x, scale_factor=0.5, mode='bilinear',
                                                                      align_corners=False), [_I0, _I1, _I2])
@@ -191,19 +191,19 @@ def make_inference(_I0, _I1, _I2, minus_t, zero_t, plus_t, _scale):
 
     for t in minus_t:
         t = -t
-        drm01r, drm21r = calc_drm_rife(t)
-        I10 = ifnet(torch.cat((f_I1, f_I0), 1), timestep=(t * 2 * drm01r),
+        drm01r, _ = calc_drm_rife(t)
+        I10 = ifnet(torch.cat((f_I1, f_I0), 1), timestep=t * (2 * drm01r),
                     scale_list=[8 / scale, 4 / scale, 2 / scale, 1 / scale])
-        output1.append(model.inference_t2(_I1, _I0, reuse_i1i0, timestep0=(t * 2) * (1 - drm10),
-                                          timestep1=1 - (t * 2) * drm01, rife=I10))
+        output1.append(model.inference_t2(_I1, _I0, reuse_i1i0, timestep0=t * (2 * (1 - drm10)),
+                                          timestep1=1 - t * (2 * drm01), rife=I10))
     for _ in zero_t:
         output1.append(_I1)
     for t in plus_t:
-        drm01r, drm21r = calc_drm_rife(t)
-        I12 = ifnet(torch.cat((f_I1, f_I2), 1), timestep=(t * 2 * drm21r),
+        _, drm21r = calc_drm_rife(t)
+        I12 = ifnet(torch.cat((f_I1, f_I2), 1), timestep=t * (2 * drm21r),
                     scale_list=[8 / scale, 4 / scale, 2 / scale, 1 / scale])
-        output2.append(model.inference_t2(_I1, _I2, reuse_i1i2, timestep0=(t * 2) * (1 - drm12),
-                                          timestep1=1 - (t * 2) * drm21, rife=I12))
+        output2.append(model.inference_t2(_I1, _I2, reuse_i1i2, timestep0=t * (2 * (1 - drm12)),
+                                          timestep1=1 - t * (2 * drm21), rife=I12))
 
     _output = output1 + output2
     _output = map(lambda x: (x[0].cpu().float().numpy().transpose(1, 2, 0) * 255.).astype(np.uint8), _output)

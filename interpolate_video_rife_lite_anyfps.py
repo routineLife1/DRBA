@@ -183,34 +183,35 @@ def make_inference(_I0, _I1, _I2, minus_t, zero_t, plus_t, _scale):
         # To align it with I0 and I2, we need to warp the drm maps.
         # Note: 1. To reverse the direction of the drm map, use 1 - drm and then warp it.
         # 2. For RIFE, drm should be aligned with the time corresponding to the intermediate frame.
-        drm01r = warp(1 - drm10, flow10 * (1 - drm10) * _t * 2, metric10, strMode='soft')
-        drm21r = warp(1 - drm12, flow12 * (1 - drm12) * _t * 2, metric12, strMode='soft')
+        _drm01r = warp(1 - drm10, flow10 * ((1 - drm10) * 2) * _t, metric10, strMode='soft')
+        _drm21r = warp(1 - drm12, flow12 * ((1 - drm12) * 2) * _t, metric12, strMode='soft')
 
-        warped_ones_mask01r = warp(ones_mask, flow10 * (1 - drm01r) * _t * 2, metric10, strMode='soft')
-        warped_ones_mask21r = warp(ones_mask, flow12 * (1 - drm21r) * _t * 2, metric12, strMode='soft')
+        warped_ones_mask01r = warp(ones_mask, flow10 * ((1 - _drm01r) * 2) * _t, metric10, strMode='soft')
+        warped_ones_mask21r = warp(ones_mask, flow12 * ((1 - _drm21r) * 2) * _t, metric12, strMode='soft')
 
         holes01r = warped_ones_mask01r < 0.999
         holes21r = warped_ones_mask21r < 0.999
 
-        drm01r[holes01r] = (1 - drm10)[holes01r]
-        drm21r[holes21r] = (1 - drm12)[holes21r]
+        _drm01r[holes01r] = (1 - drm10)[holes01r]
+        _drm21r[holes21r] = (1 - drm12)[holes21r]
 
-        drm01r, drm21r = map(lambda x: torch.nn.functional.interpolate(x, size=_I0.shape[2:], mode='bilinear',
-                                                                       align_corners=False), [drm01r, drm21r])
-        return drm01r, drm21r
+        _drm01r, _drm21r = map(lambda x: torch.nn.functional.interpolate(x, size=_I0.shape[2:], mode='bilinear',
+                                                                         align_corners=False), [_drm01r, _drm21r])
+
+        return _drm01r, _drm21r
 
     output1, output2 = list(), list()
 
     for t in minus_t:
         t = -t
-        drm01r, drm21r = calc_drm_rife(t)
-        output1.append(ifnet(torch.cat((_I1, _I0), 1), timestep=(t * 2 * drm01r),
+        drm01r, _ = calc_drm_rife(t)
+        output1.append(ifnet(torch.cat((_I1, _I0), 1), timestep=t * (2 * drm01r),
                              scale_list=[8 / scale, 4 / scale, 2 / scale, 1 / scale]))
     for _ in zero_t:
         output1.append(_I1)
     for t in plus_t:
-        drm01r, drm21r = calc_drm_rife(t)
-        output2.append(ifnet(torch.cat((_I1, _I2), 1), timestep=(t * 2 * drm21r),
+        _, drm21r = calc_drm_rife(t)
+        output2.append(ifnet(torch.cat((_I1, _I2), 1), timestep=t * (2 * drm21r),
                              scale_list=[8 / scale, 4 / scale, 2 / scale, 1 / scale]))
 
     _output = output1 + output2
