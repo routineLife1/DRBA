@@ -195,28 +195,23 @@ _thread.start_new_thread(clear_write_buffer, (write_buffer,))
 i0, i1 = get(), get()
 I0, I1 = load_image(i0, scale), load_image(i1, scale)
 
-offset = (dst_fps - src_fps) / dst_fps / 2
 t_mapper = TMapper(src_fps, dst_fps)
 idx = -1
 
 
-def calc_t(_last: np.ndarray, _idx: int):
-    ori_timestamp = np.array(t_mapper.get_range_timestamps(_idx, _idx + 1, lclose=False, rclose=True, normalize=False))
-    timestamp = ori_timestamp + offset
-    vfi_timestamp = np.round(timestamp - (_idx + 1), 4)
-
-    vfi_timestamp = np.concatenate((_last, vfi_timestamp))
-    _last = vfi_timestamp[vfi_timestamp > 0.5] - 1
-    vfi_timestamp = vfi_timestamp[vfi_timestamp <= 0.5]
+def calc_t(_idx):
+    timestamp = np.array(
+        t_mapper.get_range_timestamps(_idx - 0.5, _idx + 0.5, lclose=True, rclose=False, normalize=False))
+    vfi_timestamp = np.round(timestamp - _idx, 4)
 
     minus_t = vfi_timestamp[vfi_timestamp < 0]
     zero_t = vfi_timestamp[vfi_timestamp == 0]
     plus_t = vfi_timestamp[vfi_timestamp > 0]
-    return minus_t, zero_t, plus_t, _last
+    return minus_t, zero_t, plus_t
 
 
 # head
-mt, zt, pt, last = calc_t(np.array([]), idx)
+mt, zt, pt = calc_t(idx)
 output = make_inference(I0, I0, I1, mt, zt, pt, scale)
 for x in output:
     put(x)
@@ -228,7 +223,7 @@ while True:
         break
     I2 = load_image(i2, scale)
 
-    mt, zt, pt, last = calc_t(last, idx)
+    mt, zt, pt = calc_t(idx)
     output = make_inference(I0, I1, I2, mt, zt, pt, scale)
     for x in output:
         put(x)
@@ -239,7 +234,7 @@ while True:
     pbar.update(1)
 
 # tail(At the end, i0 and i1 have moved to the positions of index -2 and -1 frames.)
-mt, zt, pt, last = calc_t(last, idx)
+mt, zt, pt = calc_t(idx)
 output = make_inference(I0, I1, I1, mt, zt, pt, scale)
 for x in output:
     put(x)
