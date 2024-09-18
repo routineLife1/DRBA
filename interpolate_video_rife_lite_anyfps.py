@@ -1,5 +1,6 @@
 # for real-time playback(+TensorRT)
 import math
+import os
 from queue import Queue
 import cv2
 import _thread
@@ -14,6 +15,7 @@ warnings.filterwarnings("ignore")
 from models.model_nb222.MetricNet import MetricNet
 from models.model_nb222.softsplat import softsplat as warp
 from models.IFNet_HDv3 import IFNet
+from Utils_scdet.scdet import SvfiTransitionDetection
 from models.FastFlowNet.models.FastFlowNet_v2 import FastFlowNet
 
 input = r'E:\01.mkv'  # input video path
@@ -22,6 +24,17 @@ scale = 1.0  # flow scale
 dst_fps = 60  # target fps (at least greater than source video fps)
 global_size = (1920, 1080)  # frame output resolution
 hwaccel = True  # Use hardware acceleration video encoder
+
+enable_scdet = True  # enable scene detection
+scdet_threshold = 12  # scene detection threshold(The smaller the value, the more sensitive)
+
+scene_detection = SvfiTransitionDetection(os.path.dirname(output), 4,
+                                          scdet_threshold=scdet_threshold,
+                                          pure_scene_threshold=10,
+                                          no_scdet=not enable_scdet,
+                                          use_fixed_scdet=False,
+                                          fixed_max_scdet=80,
+                                          scdet_output=False)
 
 
 class TMapper:
@@ -128,7 +141,7 @@ def clear_write_buffer(w_buffer):
 
 
 @torch.autocast(device_type="cuda")
-def make_inference(_I0, _I1, _I2, minus_t, zero_t, plus_t, _scale):
+def make_inference(_I0, _I1, _I2, minus_t, zero_t, plus_t, _left_scene, _right_scene, _scale):
     def calc_flow(model, a, b):
         def centralize(img1, img2):
             b, c, h, w = img1.shape
@@ -202,19 +215,37 @@ def make_inference(_I0, _I1, _I2, minus_t, zero_t, plus_t, _scale):
 
     output1, output2 = list(), list()
 
+    if _left_scene:
+        for _ in minus_t:
+            np.append(zero_t, 0)
+        minus_t = list()
+
+    if _right_scene:
+        for _ in plus_t:
+            np.append(zero_t, 0)
+        plus_t = list()
+
+    disable_drm = False
+    if (_left_scene and not _right_scene) or (not _left_scene and _right_scene):
+        drm01r, drm21r = (ones_mask.clone() * 0.5 for _ in range(2))
+        disable_drm = True
+
     for t in minus_t:
         t = -t
-        drm01r, _ = calc_drm_rife(t)
+        if not disable_drm:
+            drm01r, _ = calc_drm_rife(t)
         output1.append(ifnet(torch.cat((_I1, _I0), 1), timestep=t * (2 * drm01r),
                              scale_list=[8 / scale, 4 / scale, 2 / scale, 1 / scale]))
     for _ in zero_t:
         output1.append(_I1)
     for t in plus_t:
-        _, drm21r = calc_drm_rife(t)
+        if not disable_drm:
+            _, drm21r = calc_drm_rife(t)
         output2.append(ifnet(torch.cat((_I1, _I2), 1), timestep=t * (2 * drm21r),
                              scale_list=[8 / scale, 4 / scale, 2 / scale, 1 / scale]))
 
     _output = output1 + output2
+
     _output = map(lambda x: (x[0].cpu().float().numpy().transpose(1, 2, 0) * 255.).astype(np.uint8), _output)
 
     return _output
@@ -235,7 +266,7 @@ i0, i1 = get(), get()
 I0, I1 = load_image(i0, scale), load_image(i1, scale)
 
 t_mapper = TMapper(src_fps, dst_fps)
-idx = -1
+idx = 0
 
 
 def calc_t(_idx: float):
@@ -251,7 +282,9 @@ def calc_t(_idx: float):
 
 # head
 mt, zt, pt = calc_t(idx)
-output = make_inference(I0, I0, I1, mt, zt, pt, scale)
+right_scene = scene_detection.check_scene(i0, i1)
+left_scene = right_scene
+output = make_inference(I0, I0, I1, mt, zt, pt, False, right_scene, scale)
 for x in output:
     put(x)
 pbar.update(1)
@@ -263,19 +296,20 @@ while True:
     I2 = load_image(i2, scale)
 
     mt, zt, pt = calc_t(idx)
-    output = make_inference(I0, I1, I2, mt, zt, pt, scale)
-
+    right_scene = scene_detection.check_scene(i1, i2)
+    output = make_inference(I0, I1, I2, mt, zt, pt, left_scene, right_scene, scale)
     for x in output:
         put(x)
 
     i0, i1 = i1, i2
     I0, I1 = I1, I2
+    left_scene = right_scene
     idx += 1
     pbar.update(1)
 
 # tail(At the end, i0 and i1 have moved to the positions of index -2 and -1 frames.)
 mt, zt, pt = calc_t(idx)
-output = make_inference(I0, I1, I1, mt, zt, pt, scale)
+output = make_inference(I0, I1, I1, mt, zt, pt, left_scene, False, scale)
 for x in output:
     put(x)
 pbar.update(1)
