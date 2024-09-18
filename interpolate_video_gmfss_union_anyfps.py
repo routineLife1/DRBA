@@ -203,12 +203,12 @@ def make_inference(_I0, _I1, _I2, minus_t, zero_t, plus_t, _left_scene, _right_s
 
     if _left_scene:
         for _ in minus_t:
-            np.append(zero_t, 0)
+            zero_t = np.append(zero_t, 0)
         minus_t = list()
 
     if _right_scene:
         for _ in plus_t:
-            np.append(zero_t, 0)
+            zero_t = np.append(zero_t, 0)
         plus_t = list()
 
     disable_drm = False

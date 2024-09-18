@@ -217,17 +217,19 @@ def make_inference(_I0, _I1, _I2, minus_t, zero_t, plus_t, _left_scene, _right_s
 
     if _left_scene:
         for _ in minus_t:
-            np.append(zero_t, 0)
+            zero_t = np.append(zero_t, 0)
         minus_t = list()
 
     if _right_scene:
         for _ in plus_t:
-            np.append(zero_t, 0)
+            zero_t = np.append(zero_t, 0)
         plus_t = list()
 
     disable_drm = False
     if (_left_scene and not _right_scene) or (not _left_scene and _right_scene):
         drm01r, drm21r = (ones_mask.clone() * 0.5 for _ in range(2))
+        drm01r, drm21r = map(lambda x: torch.nn.functional.interpolate(x, size=_I0.shape[2:], mode='bilinear',
+                                                                       align_corners=False), [drm01r, drm21r])
         disable_drm = True
 
     for t in minus_t:
