@@ -274,7 +274,7 @@ idx = 0
 def calc_t(_idx: float):
     timestamp = np.array(
         t_mapper.get_range_timestamps(_idx - 0.5, _idx + 0.5, lclose=True, rclose=False, normalize=False))
-    vfi_timestamp = np.round(timestamp - (_idx + 1), 4)
+    vfi_timestamp = np.round(timestamp - _idx, 4)
 
     minus_t = vfi_timestamp[vfi_timestamp < 0]
     zero_t = vfi_timestamp[vfi_timestamp == 0]
