@@ -154,17 +154,17 @@ def make_inference(_I0, _I1, _I2, _scale):
             t = (i + 1) / times
             # Adjust timestep parameters for interpolation between frames I0, I1, and I2
             # The drm values range from [0, 1], so scale the timestep values for interpolation between I0 and I1 by a factor of 2
-            output1.append(model.inference_t2(_I1, _I0, reuse_i1i0, timestep0=(t * 2) * (1 - drm10),
+            output1.append(model.inference_t2(_I1, _I0, reuse_i1i0, timestep0=t * (2 * (1 - drm10)),
                                               timestep1=1 - (t * 2) * drm01))
-            output2.append(model.inference_t2(_I1, _I2, reuse_i1i2, timestep0=(t * 2) * (1 - drm12),
+            output2.append(model.inference_t2(_I1, _I2, reuse_i1i2, timestep0=t * (2 * (1 - drm12)),
                                               timestep1=1 - (t * 2) * drm21))
         _output = list(reversed(output1)) + [_I1] + output2
     else:
         for i in range(times // 2):
             t = (i + 0.5) / times
-            output1.append(model.inference_t2(_I1, _I0, reuse_i1i0, timestep0=(t * 2) * (1 - drm10),
+            output1.append(model.inference_t2(_I1, _I0, reuse_i1i0, timestep0=t * (2 * (1 - drm10)),
                                               timestep1=1 - (t * 2) * drm01))
-            output2.append(model.inference_t2(_I1, _I2, reuse_i1i2, timestep0=(t * 2) * (1 - drm12),
+            output2.append(model.inference_t2(_I1, _I2, reuse_i1i2, timestep0=t * (2 * (1 - drm12)),
                                               timestep1=1 - (t * 2) * drm21))
         _output = list(reversed(output1)) + output2
 

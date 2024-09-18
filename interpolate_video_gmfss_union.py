@@ -154,11 +154,11 @@ def make_inference(_I0, _I1, _I2, _scale):
 
     def calc_drm_rife(_t):
         # For RIFE, drm should be aligned with the time corresponding to the intermediate frame.
-        drm01r = warp(1 - drm10, flow10 * (1 - drm10) * _t * 2, metric10, strMode='soft')
-        drm21r = warp(1 - drm12, flow12 * (1 - drm12) * _t * 2, metric12, strMode='soft')
+        drm01r = warp(1 - drm10, flow10 * ((1 - drm10) * 2) * _t, metric10, strMode='soft')
+        drm21r = warp(1 - drm12, flow12 * ((1 - drm12) * 2) * _t, metric12, strMode='soft')
 
-        warped_ones_mask01r = warp(ones_mask, flow10 * (1 - drm01r) * _t * 2, metric10, strMode='soft')
-        warped_ones_mask21r = warp(ones_mask, flow12 * (1 - drm21r) * _t * 2, metric12, strMode='soft')
+        warped_ones_mask01r = warp(ones_mask, flow10 * ((1 - drm01r) * 2) * _t, metric10, strMode='soft')
+        warped_ones_mask21r = warp(ones_mask, flow12 * ((1 - drm21r) * 2) * _t, metric12, strMode='soft')
 
         holes01r = warped_ones_mask01r < 0.999
         holes21r = warped_ones_mask21r < 0.999
@@ -180,15 +180,15 @@ def make_inference(_I0, _I1, _I2, _scale):
             # The drm values range from [0, 1], so scale the timestep values for interpolation between I0 and I1 by a factor of 2
 
             drm01r, drm21r = calc_drm_rife(t)
-            I10 = ifnet(torch.cat((f_I1, f_I0), 1), timestep=(t * 2 * drm01r),
+            I10 = ifnet(torch.cat((f_I1, f_I0), 1), timestep=t * (2 * drm01r),
                         scale_list=[8 / scale, 4 / scale, 2 / scale, 1 / scale])
-            I12 = ifnet(torch.cat((f_I1, f_I2), 1), timestep=(t * 2 * drm21r),
+            I12 = ifnet(torch.cat((f_I1, f_I2), 1), timestep=t * (2 * drm21r),
                         scale_list=[8 / scale, 4 / scale, 2 / scale, 1 / scale])
 
-            output1.append(model.inference_t2(_I1, _I0, reuse_i1i0, timestep0=(t * 2) * (1 - drm10),
-                                              timestep1=1 - (t * 2) * drm01, rife=I10))
-            output2.append(model.inference_t2(_I1, _I2, reuse_i1i2, timestep0=(t * 2) * (1 - drm12),
-                                              timestep1=1 - (t * 2) * drm21, rife=I12))
+            output1.append(model.inference_t2(_I1, _I0, reuse_i1i0, timestep0=t * (2 * (1 - drm10)),
+                                              timestep1=1 - t * (2 * drm01), rife=I10))
+            output2.append(model.inference_t2(_I1, _I2, reuse_i1i2, timestep0=t * (2 * (1 - drm12)),
+                                              timestep1=1 - t * (2 * drm21), rife=I12))
         _output = list(reversed(output1)) + [_I1] + output2
     else:
         for i in range(times // 2):
