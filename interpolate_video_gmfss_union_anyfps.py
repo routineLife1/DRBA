@@ -274,7 +274,7 @@ def calc_t(_idx):
 mt, zt, pt = calc_t(idx)
 right_scene = scene_detection.check_scene(i0, i1)
 left_scene = right_scene
-output = make_inference(I0, I0, I1, mt, zt, pt, scale, False, right_scene, scale)
+output = make_inference(I0, I0, I1, mt, zt, pt, False, right_scene, scale)
 for x in output:
     put(x)
 pbar.update(1)
