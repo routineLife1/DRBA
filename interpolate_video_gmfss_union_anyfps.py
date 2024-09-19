@@ -1,5 +1,6 @@
 # for high quality output
 import math
+import os
 import subprocess
 from queue import Queue
 import cv2
