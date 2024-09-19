@@ -8,7 +8,8 @@ from tqdm import tqdm
 import torch
 import numpy as np
 import time
-from models.model_nb222.softsplat import softsplat as warp
+from scdet import SvfiTransitionDetection
+from models.model_pg104.softsplat import softsplat as warp
 from models.model_pg104.GMFSS import Model
 from models.rife_422_lite.IFNet_HDv3 import IFNet
 import warnings
@@ -21,6 +22,17 @@ scale = 1.0  # flow scale
 dst_fps = 60  # target fps (at least greater than source video fps)
 global_size = (1920, 1080)  # frame output resolution
 hwaccel = True  # Use hardware acceleration video encoder
+
+enable_scdet = True  # enable scene detection
+scdet_threshold = 12  # scene detection threshold(The smaller the value, the more sensitive)
+
+scene_detection = SvfiTransitionDetection(os.path.dirname(output), 4,
+                                          scdet_threshold=scdet_threshold,
+                                          pure_scene_threshold=10,
+                                          no_scdet=not enable_scdet,
+                                          use_fixed_scdet=False,
+                                          fixed_max_scdet=80,
+                                          scdet_output=False)
 
 
 class TMapper:
@@ -127,7 +139,7 @@ def clear_write_buffer(w_buffer):
 
 
 @torch.autocast(device_type="cuda")
-def make_inference(_I0, _I1, _I2, minus_t, zero_t, plus_t, _scale):
+def make_inference(_I0, _I1, _I2, minus_t, zero_t, plus_t, _left_scene, _right_scene, _scale):
     # Flow distance calculator
     def distance_calculator(_x):
         u, v = _x[:, 0:1], _x[:, 1:]
@@ -189,9 +201,25 @@ def make_inference(_I0, _I1, _I2, minus_t, zero_t, plus_t, _scale):
 
     output1, output2 = list(), list()
 
+    if _left_scene:
+        for _ in minus_t:
+            zero_t = np.append(zero_t, 0)
+        minus_t = list()
+
+    if _right_scene:
+        for _ in plus_t:
+            zero_t = np.append(zero_t, 0)
+        plus_t = list()
+
+    disable_drm = False
+    if (_left_scene and not _right_scene) or (not _left_scene and _right_scene):
+        drm10, drm21, drm01r, drm21r = (ones_mask.clone() * 0.5 for _ in range(4))
+        disable_drm = True
+
     for t in minus_t:
         t = -t
-        drm01r, _ = calc_drm_rife(t)
+        if not disable_drm:
+            drm01r, _ = calc_drm_rife(t)
         I10 = ifnet(torch.cat((f_I1, f_I0), 1), timestep=t * (2 * drm01r),
                     scale_list=[8 / scale, 4 / scale, 2 / scale, 1 / scale])
         output1.append(model.inference_t2(_I1, _I0, reuse_i1i0, timestep0=t * (2 * (1 - drm10)),
@@ -199,13 +227,15 @@ def make_inference(_I0, _I1, _I2, minus_t, zero_t, plus_t, _scale):
     for _ in zero_t:
         output1.append(_I1)
     for t in plus_t:
-        _, drm21r = calc_drm_rife(t)
+        if not disable_drm:
+            _, drm21r = calc_drm_rife(t)
         I12 = ifnet(torch.cat((f_I1, f_I2), 1), timestep=t * (2 * drm21r),
                     scale_list=[8 / scale, 4 / scale, 2 / scale, 1 / scale])
         output2.append(model.inference_t2(_I1, _I2, reuse_i1i2, timestep0=t * (2 * (1 - drm12)),
                                           timestep1=1 - t * (2 * drm21), rife=I12))
 
     _output = output1 + output2
+
     _output = map(lambda x: (x[0].cpu().float().numpy().transpose(1, 2, 0) * 255.).astype(np.uint8), _output)
 
     return _output
@@ -226,7 +256,7 @@ i0, i1 = get(), get()
 I0, I1 = load_image(i0, scale), load_image(i1, scale)
 
 t_mapper = TMapper(src_fps, dst_fps)
-idx = -1
+idx = 0
 
 
 def calc_t(_idx):
@@ -242,7 +272,9 @@ def calc_t(_idx):
 
 # head
 mt, zt, pt = calc_t(idx)
-output = make_inference(I0, I0, I1, mt, zt, pt, scale)
+right_scene = scene_detection.check_scene(i0, i1)
+left_scene = right_scene
+output = make_inference(I0, I0, I1, mt, zt, pt, False, right_scene, scale)
 for x in output:
     put(x)
 pbar.update(1)
@@ -254,18 +286,20 @@ while True:
     I2 = load_image(i2, scale)
 
     mt, zt, pt = calc_t(idx)
-    output = make_inference(I0, I1, I2, mt, zt, pt, scale)
+    right_scene = scene_detection.check_scene(i1, i2)
+    output = make_inference(I0, I1, I2, mt, zt, pt, left_scene, right_scene, scale)
     for x in output:
         put(x)
 
     i0, i1 = i1, i2
     I0, I1 = I1, I2
+    left_scene = right_scene
     idx += 1
     pbar.update(1)
 
 # tail(At the end, i0 and i1 have moved to the positions of index -2 and -1 frames.)
 mt, zt, pt = calc_t(idx)
-output = make_inference(I0, I1, I1, mt, zt, pt, scale)
+output = make_inference(I0, I1, I1, mt, zt, pt, left_scene, False, scale)
 for x in output:
     put(x)
 pbar.update(1)
