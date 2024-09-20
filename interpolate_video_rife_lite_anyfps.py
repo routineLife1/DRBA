@@ -15,26 +15,19 @@ warnings.filterwarnings("ignore")
 from models.model_nb222.MetricNet import MetricNet
 from models.model_nb222.softsplat import softsplat as warp
 from models.rife_422_lite.IFNet_HDv3 import IFNet
-from scdet import SvfiTransitionDetection
 from models.FastFlowNet.models.FastFlowNet_v2 import FastFlowNet
 
-input = r'E:\01.mkv'  # input video path
-output = r'D:\tmp\output.mkv'  # output video path
+input = r'E:\Toooooo Many Losing Heroines.mp4'  # input video path
+output = r'D:\tmp\test.mkv'  # output video path
 scale = 1.0  # flow scale
 dst_fps = 60  # target fps (at least greater than source video fps)
 global_size = (1920, 1080)  # frame output resolution
 hwaccel = True  # Use hardware acceleration video encoder
 
 enable_scdet = True  # enable scene detection
-scdet_threshold = 12  # scene detection threshold(The smaller the value, the more sensitive)
+scdet_threshold = 50  # scene detection threshold(The smaller the value, the more sensitive)
 
-scene_detection = SvfiTransitionDetection(os.path.dirname(output), 4,
-                                          scdet_threshold=scdet_threshold,
-                                          pure_scene_threshold=10,
-                                          no_scdet=not enable_scdet,
-                                          use_fixed_scdet=False,
-                                          fixed_max_scdet=80,
-                                          scdet_output=False)
+scene_detection = lambda x1, x2: np.abs(x1 - x2).mean() > scdet_threshold if enable_scdet else False
 
 
 class TMapper:
@@ -141,7 +134,7 @@ def clear_write_buffer(w_buffer):
 
 
 @torch.autocast(device_type="cuda")
-def make_inference(_I0, _I1, _I2, minus_t, zero_t, plus_t, _left_scene, _right_scene, _scale):
+def make_inference(_I0, _I1, _I2, minus_t, zero_t, plus_t, _left_scene, _right_scene, _scale, _tmp_flow=None):
     def calc_flow(model, a, b):
         def centralize(img1, img2):
             b, c, h, w = img1.shape
@@ -169,8 +162,8 @@ def make_inference(_I0, _I1, _I2, minus_t, zero_t, plus_t, _left_scene, _right_s
         lambda x: torch.nn.functional.interpolate(x, size=(576, 1024), mode='bilinear', align_corners=False),
         [_I0, _I1, _I2])
 
-    flow01 = calc_flow(flownet, I0f, I1f)
-    flow10 = calc_flow(flownet, I1f, I0f)
+    flow01 = calc_flow(flownet, I0f, I1f) if _tmp_flow is None else _tmp_flow[0]
+    flow10 = calc_flow(flownet, I1f, I0f) if _tmp_flow is None else _tmp_flow[1]
     flow12 = calc_flow(flownet, I1f, I2f)
     flow21 = calc_flow(flownet, I2f, I1f)
 
@@ -250,7 +243,7 @@ def make_inference(_I0, _I1, _I2, minus_t, zero_t, plus_t, _left_scene, _right_s
 
     _output = map(lambda x: (x[0].cpu().float().numpy().transpose(1, 2, 0) * 255.).astype(np.uint8), _output)
 
-    return _output
+    return _output, (flow12, flow21)
 
 
 video_capture = cv2.VideoCapture(input)
@@ -286,7 +279,7 @@ def calc_t(_idx: float):
 mt, zt, pt = calc_t(idx)
 right_scene = scene_detection.check_scene(i0, i1)
 left_scene = right_scene
-output = make_inference(I0, I0, I1, mt, zt, pt, False, right_scene, scale)
+output, tmp_flow = make_inference(I0, I0, I1, mt, zt, pt, False, right_scene, scale, None)
 for x in output:
     put(x)
 pbar.update(1)
@@ -299,7 +292,8 @@ while True:
 
     mt, zt, pt = calc_t(idx)
     right_scene = scene_detection.check_scene(i1, i2)
-    output = make_inference(I0, I1, I2, mt, zt, pt, left_scene, right_scene, scale)
+    # output, tmp_flow = make_inference(I0, I1, I2, mt, zt, pt, left_scene, right_scene, scale, tmp_flow)
+    output, tmp_flow = make_inference(I0, I1, I2, mt, zt, pt, left_scene, right_scene, scale, None)
     for x in output:
         put(x)
 
@@ -311,7 +305,9 @@ while True:
 
 # tail(At the end, i0 and i1 have moved to the positions of index -2 and -1 frames.)
 mt, zt, pt = calc_t(idx)
-output = make_inference(I0, I1, I1, mt, zt, pt, left_scene, False, scale)
+# output, tmp_flow = make_inference(I0, I1, I1, mt, zt, pt, left_scene, False, scale, tmp_flow)
+output, tmp_flow = make_inference(I0, I1, I2, mt, zt, pt, left_scene, right_scene, scale, None)
+
 for x in output:
     put(x)
 pbar.update(1)
