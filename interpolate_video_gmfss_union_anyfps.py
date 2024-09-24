@@ -142,7 +142,7 @@ def make_inference(_I0, _I1, _I2, minus_t, zero_t, plus_t, _left_scene, _right_s
         u, v = _x[:, 0:1], _x[:, 1:]
         return torch.sqrt(u ** 2 + v ** 2)
 
-    reuse_i1i0 = model.reuse(_I1, _I0, scale) if _reuse is None else _reuse[0]
+    reuse_i1i0 = model.reuse(_I1, _I0, scale) if _reuse is None else _reuse
     reuse_i1i2 = model.reuse(_I1, _I2, scale)
 
     flow10, metric10 = reuse_i1i0[0], reuse_i1i0[2]
@@ -235,12 +235,12 @@ def make_inference(_I0, _I1, _I2, minus_t, zero_t, plus_t, _left_scene, _right_s
 
     _output = map(lambda x: (x[0].cpu().float().numpy().transpose(1, 2, 0) * 255.).astype(np.uint8), _output)
 
-    # next reuse_i1i0 = reverse(last reuse_i1i2)
+    # next reuse_i1i0 = reverse(current reuse_i1i2)
     # f0, f1, m0, m1, feat0, feat1 = reuse_i1i2
     # _reuse = (f1, f0, m1, m0, feat1, feat0)
     _reuse = [value for pair in zip(reuse_i1i2[1::2], reuse_i1i2[0::2]) for value in pair]
 
-    return _output, (_reuse,)
+    return _output, _reuse
 
 
 video_capture = cv2.VideoCapture(input)

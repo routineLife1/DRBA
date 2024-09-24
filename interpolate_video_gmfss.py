@@ -106,13 +106,13 @@ def clear_write_buffer(w_buffer):
 
 
 @torch.autocast(device_type="cuda")
-def make_inference(_I0, _I1, _I2, _scale):
+def make_inference(_I0, _I1, _I2, _scale, _reuse=None):
     # Flow distance calculator
     def distance_calculator(_x):
         u, v = _x[:, 0:1], _x[:, 1:]
         return torch.sqrt(u ** 2 + v ** 2)
 
-    reuse_i1i0 = model.reuse(_I1, _I0, scale)
+    reuse_i1i0 = model.reuse(_I1, _I0, scale) if _reuse is None else _reuse
     reuse_i1i2 = model.reuse(_I1, _I2, scale)
 
     flow10, metric10 = reuse_i1i0[0], reuse_i1i0[2]
@@ -170,7 +170,12 @@ def make_inference(_I0, _I1, _I2, _scale):
 
     _output = map(lambda x: (x[0].cpu().float().numpy().transpose(1, 2, 0) * 255.).astype(np.uint8), _output)
 
-    return _output
+    # next reuse_i1i0 = reverse(current reuse_i1i2)
+    # f0, f1, m0, m1, feat0, feat1 = reuse_i1i2
+    # _reuse = (f1, f0, m1, m0, feat1, feat0)
+    _reuse = [value for pair in zip(reuse_i1i2[1::2], reuse_i1i2[0::2]) for value in pair]
+
+    return _output, _reuse
 
 
 video_capture = cv2.VideoCapture(input)
@@ -186,7 +191,7 @@ i0, i1 = get(), get()
 I0, I1 = load_image(i0, scale), load_image(i1, scale)
 
 # head
-output = make_inference(I0, I0, I1, scale)
+output, reuse = make_inference(I0, I0, I1, scale, None)
 for x in output:
     put(x)
 pbar.update(1)
@@ -197,7 +202,7 @@ while True:
         break
     I2 = load_image(i2, scale)
 
-    output = make_inference(I0, I1, I2, scale)
+    output, reuse = make_inference(I0, I1, I2, scale, reuse)
     for x in output:
         put(x)
 
@@ -206,7 +211,7 @@ while True:
     pbar.update(1)
 
 # tail(At the end, i0 and i1 have moved to the positions of index -2 and -1 frames.)
-output = make_inference(I0, I1, I1, scale)
+output, _ = make_inference(I0, I1, I1, scale, reuse)
 for x in output:
     put(x)
 pbar.update(1)

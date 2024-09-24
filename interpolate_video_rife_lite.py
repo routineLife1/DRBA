@@ -107,27 +107,30 @@ def clear_write_buffer(w_buffer):
 
 
 @torch.autocast(device_type="cuda")
-def make_inference(_I0, _I1, _I2, _scale):
+def make_inference(_I0, _I1, _I2, _scale, _reuse):
     def calc_flow(model, a, b):
         imgs = torch.cat((a, b), 1)
         scale_list = [16 / scale, 8 / scale, 4 / scale, 2 / scale, 1 / scale]
-        flow50 = model(imgs, 0.5, scale_list)[1][-1][:, :2]  # only need forward direction flow
+        flow = model(imgs, 0.5, scale_list)[1][-1]
+        flow50, flow51 = flow[:, :2], flow[:, 2:]  # only need forward direction flow
         flow05 = warp(flow50, flow50, None, 'avg')
+        flow15 = warp(flow51, flow51, None, 'avg')
         flow05 = -flow05
+        flow15 = -flow15
         # qvi
         # flow05, norm2 = fwarp(flow50, flow50)
         # flow05[norm2]...
         # flow05 = -flow05
 
-        return flow05
+        return flow05, flow15
 
     # Flow distance calculator
     def distance_calculator(_x):
         u, v = _x[:, 0:1], _x[:, 1:]
         return torch.sqrt(u ** 2 + v ** 2)
 
-    flow10 = calc_flow(flownet, _I1, _I0)
-    flow12 = calc_flow(flownet, _I1, _I2)
+    flow10, flow01 = calc_flow(flownet, _I1, _I0) if not _reuse else _reuse
+    flow12, flow21 = calc_flow(flownet, _I1, _I2)
 
     # Compute the distance using the optical flow and distance calculator
     d10 = distance_calculator(flow10) + 1e-4
@@ -194,7 +197,8 @@ def make_inference(_I0, _I1, _I2, _scale):
 
     _output = map(lambda x: (x[0].cpu().float().numpy().transpose(1, 2, 0) * 255.).astype(np.uint8), _output)
 
-    return _output
+    # next flow10, flow01 = reverse(current flow12, flow21)
+    return _output, (flow21, flow12)
 
 
 video_capture = cv2.VideoCapture(input)
@@ -210,7 +214,7 @@ i0, i1 = get(), get()
 I0, I1 = load_image(i0, scale), load_image(i1, scale)
 
 # head
-output = make_inference(I0, I0, I1, scale)
+output, reuse = make_inference(I0, I0, I1, scale, None)
 for x in output:
     put(x)
 pbar.update(1)
@@ -221,7 +225,7 @@ while True:
         break
     I2 = load_image(i2, scale)
 
-    output = make_inference(I0, I1, I2, scale)
+    output, reuse = make_inference(I0, I1, I2, scale, reuse)
 
     for x in output:
         put(x)
@@ -231,7 +235,7 @@ while True:
     pbar.update(1)
 
 # tail(At the end, i0 and i1 have moved to the positions of index -2 and -1 frames.)
-output = make_inference(I0, I1, I1, scale)
+output, _ = make_inference(I0, I1, I1, scale, reuse)
 for x in output:
     put(x)
 pbar.update(1)
