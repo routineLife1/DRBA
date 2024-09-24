@@ -1,6 +1,5 @@
 # for real-time playback(+TensorRT)
 import math
-import os
 from queue import Queue
 import cv2
 import _thread
@@ -12,22 +11,24 @@ import time
 import warnings
 
 warnings.filterwarnings("ignore")
-from models.model_nb222.MetricNet import MetricNet
-from models.model_nb222.softsplat import softsplat as warp
-from models.rife_422_lite.IFNet_HDv3 import IFNet
-from models.FastFlowNet.models.FastFlowNet_v2 import FastFlowNet
+from models.rife_426.softsplat import softsplat as warp
+from models.rife_426.IFNet_HDv3 import IFNet
 
-input = r'E:\Toooooo Many Losing Heroines.mp4'  # input video path
-output = r'D:\tmp\test.mkv'  # output video path
+input = r'E:\01.mkv'  # input video path
+output = r'D:\tmp\output.mkv'  # output video path
 scale = 1.0  # flow scale
 dst_fps = 60  # target fps (at least greater than source video fps)
 global_size = (1920, 1080)  # frame output resolution
 hwaccel = True  # Use hardware acceleration video encoder
 
 enable_scdet = True  # enable scene detection
-scdet_threshold = 50  # scene detection threshold(The smaller the value, the more sensitive)
+scdet_threshold = 100  # scene detection threshold(The smaller the value, the more sensitive)
 
-scene_detection = lambda x1, x2: np.abs(x1 - x2).mean() > scdet_threshold if enable_scdet else False
+
+def check_scene(x1, x2):
+    if not enable_scdet:
+        return False
+    return np.abs(x1 - x2).mean() > scdet_threshold
 
 
 class TMapper:
@@ -83,11 +84,8 @@ def convert(param):
 
 
 ifnet = IFNet().cuda().eval()
-ifnet.load_state_dict(convert(torch.load(r'weights\train_log_rife_422_lite\rife.pkl', map_location='cpu')), False)
-flownet = FastFlowNet().cuda().eval()
-flownet.load_state_dict(torch.load(r'weights\train_log_rife_422_lite\fastflownet_ft_sintel.pth', map_location='cpu'))
-metricnet = MetricNet().cuda().eval()
-metricnet.load_state_dict(torch.load(r'weights\train_log_rife_422_lite\metric.pkl', map_location='cpu'))
+ifnet.load_state_dict(convert(torch.load(r'weights/train_log_rife_426/flownet.pkl', map_location='cpu')), False)
+flownet = ifnet
 
 
 def to_tensor(img):
@@ -134,38 +132,27 @@ def clear_write_buffer(w_buffer):
 
 
 @torch.autocast(device_type="cuda")
-def make_inference(_I0, _I1, _I2, minus_t, zero_t, plus_t, _left_scene, _right_scene, _scale, _tmp_flow=None):
+def make_inference(_I0, _I1, _I2, minus_t, zero_t, plus_t, _left_scene, _right_scene, _scale, _reuse=None):
     def calc_flow(model, a, b):
-        def centralize(img1, img2):
-            b, c, h, w = img1.shape
-            rgb_mean = torch.cat([img1, img2], dim=2).view(b, c, -1).mean(2).view(b, c, 1, 1)
-            return img1 - rgb_mean, img2 - rgb_mean, rgb_mean
+        imgs = torch.cat((a, b), 1)
+        scale_list = [16 / scale, 8 / scale, 4 / scale, 2 / scale, 1 / scale]
+        flow50 = model(imgs, 0.5, scale_list)[1][-1][:, :2]  # only need forward direction flow
+        flow05 = warp(flow50, flow50, None, 'avg')
+        flow05 = -flow05
+        # qvi
+        # flow05, norm2 = fwarp(flow50, flow50)
+        # flow05[norm2]...
+        # flow05 = -flow05
 
-        a, b, _ = centralize(a, b)
-
-        input_t = torch.cat([a, b], 1)
-
-        output = model(input_t).data
-
-        flow = 20.0 * output
-
-        return flow
+        return flow05
 
     # Flow distance calculator
     def distance_calculator(_x):
         u, v = _x[:, 0:1], _x[:, 1:]
         return torch.sqrt(u ** 2 + v ** 2)
 
-    # When using FastFlowNet to calculate optical flow, the input image size is uniformly reduced to half of the original size.
-    # FastFlowNet requires the input image dimensions to be divisible by 64.
-    I0f, I1f, I2f = map(
-        lambda x: torch.nn.functional.interpolate(x, size=(576, 1024), mode='bilinear', align_corners=False),
-        [_I0, _I1, _I2])
-
-    flow01 = calc_flow(flownet, I0f, I1f) if _tmp_flow is None else _tmp_flow[0]
-    flow10 = calc_flow(flownet, I1f, I0f) if _tmp_flow is None else _tmp_flow[1]
-    flow12 = calc_flow(flownet, I1f, I2f)
-    flow21 = calc_flow(flownet, I2f, I1f)
+    flow10 = calc_flow(flownet, _I1, _I0)
+    flow12 = calc_flow(flownet, _I1, _I2)
 
     # Compute the distance using the optical flow and distance calculator
     d10 = distance_calculator(flow10) + 1e-4
@@ -175,13 +162,6 @@ def make_inference(_I0, _I1, _I2, minus_t, zero_t, plus_t, _left_scene, _right_s
     drm10 = d10 / (d10 + d12)
     drm12 = d12 / (d10 + d12)
 
-    I0ff, I1ff, I2ff = map(
-        lambda x: torch.nn.functional.interpolate(x, size=flow01.shape[2:], mode='bilinear', align_corners=False),
-        [_I0, _I1, _I2])
-
-    _, metric10 = metricnet(I0ff, I1ff, flow01, flow10)
-    metric12, _ = metricnet(I1ff, I2ff, flow12, flow21)
-
     ones_mask = torch.ones_like(drm10, device=drm10.device)
 
     def calc_drm_rife(_t):
@@ -189,11 +169,11 @@ def make_inference(_I0, _I1, _I2, minus_t, zero_t, plus_t, _left_scene, _right_s
         # To align it with I0 and I2, we need to warp the drm maps.
         # Note: 1. To reverse the direction of the drm map, use 1 - drm and then warp it.
         # 2. For RIFE, drm should be aligned with the time corresponding to the intermediate frame.
-        _drm01r = warp(1 - drm10, flow10 * ((1 - drm10) * 2) * _t, metric10, strMode='soft')
-        _drm21r = warp(1 - drm12, flow12 * ((1 - drm12) * 2) * _t, metric12, strMode='soft')
+        _drm01r = warp(1 - drm10, flow10 * ((1 - drm10) * 2) * _t, None, strMode='avg')
+        _drm21r = warp(1 - drm12, flow12 * ((1 - drm12) * 2) * _t, None, strMode='avg')
 
-        warped_ones_mask01r = warp(ones_mask, flow10 * ((1 - _drm01r) * 2) * _t, metric10, strMode='soft')
-        warped_ones_mask21r = warp(ones_mask, flow12 * ((1 - _drm21r) * 2) * _t, metric12, strMode='soft')
+        warped_ones_mask01r = warp(ones_mask, flow10 * ((1 - _drm01r) * 2) * _t, None, strMode='avg')
+        warped_ones_mask21r = warp(ones_mask, flow12 * ((1 - _drm21r) * 2) * _t, None, strMode='avg')
 
         holes01r = warped_ones_mask01r < 0.999
         holes21r = warped_ones_mask21r < 0.999
@@ -230,20 +210,21 @@ def make_inference(_I0, _I1, _I2, minus_t, zero_t, plus_t, _left_scene, _right_s
         if not disable_drm:
             drm01r, _ = calc_drm_rife(t)
         output1.append(ifnet(torch.cat((_I1, _I0), 1), timestep=t * (2 * drm01r),
-                             scale_list=[8 / scale, 4 / scale, 2 / scale, 1 / scale]))
+                             scale_list=[16 / scale, 8 / scale, 4 / scale, 2 / scale, 1 / scale])[0])
     for _ in zero_t:
         output1.append(_I1)
     for t in plus_t:
         if not disable_drm:
             _, drm21r = calc_drm_rife(t)
         output2.append(ifnet(torch.cat((_I1, _I2), 1), timestep=t * (2 * drm21r),
-                             scale_list=[8 / scale, 4 / scale, 2 / scale, 1 / scale]))
+                             scale_list=[16 / scale, 8 / scale, 4 / scale, 2 / scale, 1 / scale])[0])
 
     _output = output1 + output2
 
     _output = map(lambda x: (x[0].cpu().float().numpy().transpose(1, 2, 0) * 255.).astype(np.uint8), _output)
 
-    return _output, (flow12, flow21)
+    # return _output, (flow12, flow21)
+    return _output, None
 
 
 video_capture = cv2.VideoCapture(input)
@@ -277,9 +258,9 @@ def calc_t(_idx: float):
 
 # head
 mt, zt, pt = calc_t(idx)
-right_scene = scene_detection.check_scene(i0, i1)
+right_scene = check_scene(i0, i1)
 left_scene = right_scene
-output, tmp_flow = make_inference(I0, I0, I1, mt, zt, pt, False, right_scene, scale, None)
+output, reuse = make_inference(I0, I0, I1, mt, zt, pt, False, right_scene, scale, None)
 for x in output:
     put(x)
 pbar.update(1)
@@ -291,9 +272,8 @@ while True:
     I2 = load_image(i2, scale)
 
     mt, zt, pt = calc_t(idx)
-    right_scene = scene_detection.check_scene(i1, i2)
-    # output, tmp_flow = make_inference(I0, I1, I2, mt, zt, pt, left_scene, right_scene, scale, tmp_flow)
-    output, tmp_flow = make_inference(I0, I1, I2, mt, zt, pt, left_scene, right_scene, scale, None)
+    right_scene = check_scene(i1, i2)
+    output, reuse = make_inference(I0, I1, I2, mt, zt, pt, left_scene, right_scene, scale, reuse)
     for x in output:
         put(x)
 
@@ -305,8 +285,7 @@ while True:
 
 # tail(At the end, i0 and i1 have moved to the positions of index -2 and -1 frames.)
 mt, zt, pt = calc_t(idx)
-# output, tmp_flow = make_inference(I0, I1, I1, mt, zt, pt, left_scene, False, scale, tmp_flow)
-output, tmp_flow = make_inference(I0, I1, I2, mt, zt, pt, left_scene, right_scene, scale, None)
+output, _ = make_inference(I0, I1, I1, mt, zt, pt, left_scene, False, scale, reuse)
 
 for x in output:
     put(x)

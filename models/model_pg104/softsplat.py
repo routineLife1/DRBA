@@ -253,7 +253,7 @@ def softsplat(tenIn: torch.Tensor, tenFlow: torch.Tensor, tenMetric: torch.Tenso
     assert (strMode.split('-')[0] in ['sum', 'avg', 'linear', 'soft'])
 
     if strMode == 'sum': assert (tenMetric is None)
-    if strMode == 'avg': assert (tenMetric is None)
+    # if strMode == 'avg': assert (tenMetric is None)
     if strMode.split('-')[0] == 'linear': assert (tenMetric is not None)
     if strMode.split('-')[0] == 'soft': assert (tenMetric is not None)
 

@@ -1,6 +1,5 @@
 # for high quality output
 import math
-import os
 import subprocess
 from queue import Queue
 import cv2
@@ -24,10 +23,13 @@ global_size = (1920, 1080)  # frame output resolution
 hwaccel = True  # Use hardware acceleration video encoder
 
 enable_scdet = True  # enable scene detection
-scdet_threshold = 50  # scene detection threshold(The smaller the value, the more sensitive)
+scdet_threshold = 100  # scene detection threshold(The smaller the value, the more sensitive)
 
-scene_detection = lambda x1, x2: np.abs(x1 - x2).mean() > scdet_threshold if enable_scdet else False
 
+def check_scene(x1, x2):
+    if not enable_scdet:
+        return False
+    return np.abs(x1 - x2).mean() > scdet_threshold
 
 
 class TMapper:
@@ -82,8 +84,8 @@ def convert(param):
     }
 
 
-ifnet = IFNet().cuda().eval()
-ifnet.load_state_dict(convert(torch.load(r'weights\rife.pkl', map_location='cpu')), False)
+ifnet = IFNet().to(device).eval()
+ifnet.load_state_dict(convert(torch.load(r'weights\train_log_rife_422_lite\flownet.pkl', map_location='cpu')), False)
 model = Model()
 model.load_model(r'weights\train_log_pg104', -1)
 model.device()
@@ -134,13 +136,13 @@ def clear_write_buffer(w_buffer):
 
 
 @torch.autocast(device_type="cuda")
-def make_inference(_I0, _I1, _I2, minus_t, zero_t, plus_t, _left_scene, _right_scene, _scale):
+def make_inference(_I0, _I1, _I2, minus_t, zero_t, plus_t, _left_scene, _right_scene, _scale, _reuse=None):
     # Flow distance calculator
     def distance_calculator(_x):
         u, v = _x[:, 0:1], _x[:, 1:]
         return torch.sqrt(u ** 2 + v ** 2)
 
-    reuse_i1i0 = model.reuse(_I1, _I0, scale)
+    reuse_i1i0 = model.reuse(_I1, _I0, scale) if _reuse is None else _reuse[0]
     reuse_i1i2 = model.reuse(_I1, _I2, scale)
 
     flow10, metric10 = reuse_i1i0[0], reuse_i1i0[2]
@@ -233,7 +235,7 @@ def make_inference(_I0, _I1, _I2, minus_t, zero_t, plus_t, _left_scene, _right_s
 
     _output = map(lambda x: (x[0].cpu().float().numpy().transpose(1, 2, 0) * 255.).astype(np.uint8), _output)
 
-    return _output
+    return _output, (reuse_i1i2,)
 
 
 video_capture = cv2.VideoCapture(input)
@@ -267,9 +269,9 @@ def calc_t(_idx):
 
 # head
 mt, zt, pt = calc_t(idx)
-right_scene = scene_detection.check_scene(i0, i1)
+right_scene = check_scene(i0, i1)
 left_scene = right_scene
-output = make_inference(I0, I0, I1, mt, zt, pt, False, right_scene, scale)
+output, reuse = make_inference(I0, I0, I1, mt, zt, pt, False, right_scene, scale, None)
 for x in output:
     put(x)
 pbar.update(1)
@@ -281,8 +283,8 @@ while True:
     I2 = load_image(i2, scale)
 
     mt, zt, pt = calc_t(idx)
-    right_scene = scene_detection.check_scene(i1, i2)
-    output = make_inference(I0, I1, I2, mt, zt, pt, left_scene, right_scene, scale)
+    right_scene = check_scene(i1, i2)
+    output, reuse = make_inference(I0, I1, I2, mt, zt, pt, left_scene, right_scene, scale, reuse)
     for x in output:
         put(x)
 
@@ -294,7 +296,7 @@ while True:
 
 # tail(At the end, i0 and i1 have moved to the positions of index -2 and -1 frames.)
 mt, zt, pt = calc_t(idx)
-output = make_inference(I0, I1, I1, mt, zt, pt, left_scene, False, scale)
+output, _ = make_inference(I0, I1, I1, mt, zt, pt, left_scene, False, scale, reuse)
 for x in output:
     put(x)
 pbar.update(1)

@@ -7,10 +7,8 @@ import subprocess
 import torch
 import numpy as np
 import time
-from models.model_nb222.MetricNet import MetricNet
-from models.model_nb222.softsplat import softsplat as warp
-from models.rife_422_lite.IFNet_HDv3 import IFNet
-from models.FastFlowNet.models.FastFlowNet_v2 import FastFlowNet
+from models.rife_426.softsplat import softsplat as warp
+from models.rife_426.IFNet_HDv3 import IFNet
 import warnings
 
 warnings.filterwarnings("ignore")
@@ -61,11 +59,8 @@ def convert(param):
 
 
 ifnet = IFNet().cuda().eval()
-ifnet.load_state_dict(convert(torch.load(r'weights\train_log_rife_422_lite\rife.pkl', map_location='cpu')), False)
-flownet = FastFlowNet().cuda().eval()
-flownet.load_state_dict(torch.load(r'weights\train_log_rife_422_lite\fastflownet_ft_sintel.pth', map_location='cpu'))
-metricnet = MetricNet().cuda().eval()
-metricnet.load_state_dict(torch.load(r'weights\train_log_rife_422_lite\metric.pkl', map_location='cpu'))
+ifnet.load_state_dict(convert(torch.load(r'weights/train_log_rife_426/flownet.pkl', map_location='cpu')), False)
+flownet = ifnet
 
 
 def to_tensor(img):
@@ -114,36 +109,25 @@ def clear_write_buffer(w_buffer):
 @torch.autocast(device_type="cuda")
 def make_inference(_I0, _I1, _I2, _scale):
     def calc_flow(model, a, b):
-        def centralize(img1, img2):
-            b, c, h, w = img1.shape
-            rgb_mean = torch.cat([img1, img2], dim=2).view(b, c, -1).mean(2).view(b, c, 1, 1)
-            return img1 - rgb_mean, img2 - rgb_mean, rgb_mean
+        imgs = torch.cat((a, b), 1)
+        scale_list = [16 / scale, 8 / scale, 4 / scale, 2 / scale, 1 / scale]
+        flow50 = model(imgs, 0.5, scale_list)[1][-1][:, :2]  # only need forward direction flow
+        flow05 = warp(flow50, flow50, None, 'avg')
+        flow05 = -flow05
+        # qvi
+        # flow05, norm2 = fwarp(flow50, flow50)
+        # flow05[norm2]...
+        # flow05 = -flow05
 
-        a, b, _ = centralize(a, b)
-
-        input_t = torch.cat([a, b], 1)
-
-        output = model(input_t).data
-
-        flow = 20.0 * output
-
-        return flow
+        return flow05
 
     # Flow distance calculator
     def distance_calculator(_x):
         u, v = _x[:, 0:1], _x[:, 1:]
         return torch.sqrt(u ** 2 + v ** 2)
 
-    # When using FastFlowNet to calculate optical flow, the input image size is uniformly reduced to half of the original size.
-    # FastFlowNet requires the input image dimensions to be divisible by 64.
-    I0f, I1f, I2f = map(
-        lambda x: torch.nn.functional.interpolate(x, size=(576, 1024), mode='bilinear', align_corners=False),
-        [_I0, _I1, _I2])
-
-    flow01 = calc_flow(flownet, I0f, I1f)
-    flow10 = calc_flow(flownet, I1f, I0f)
-    flow12 = calc_flow(flownet, I1f, I2f)
-    flow21 = calc_flow(flownet, I2f, I1f)
+    flow10 = calc_flow(flownet, _I1, _I0)
+    flow12 = calc_flow(flownet, _I1, _I2)
 
     # Compute the distance using the optical flow and distance calculator
     d10 = distance_calculator(flow10) + 1e-4
@@ -153,13 +137,6 @@ def make_inference(_I0, _I1, _I2, _scale):
     drm10 = d10 / (d10 + d12)
     drm12 = d12 / (d10 + d12)
 
-    I0ff, I1ff, I2ff = map(
-        lambda x: torch.nn.functional.interpolate(x, size=flow01.shape[2:], mode='bilinear', align_corners=False),
-        [_I0, _I1, _I2])
-
-    _, metric10 = metricnet(I0ff, I1ff, flow01, flow10)
-    metric12, _ = metricnet(I1ff, I2ff, flow12, flow21)
-
     ones_mask = torch.ones_like(drm10, device=drm10.device)
 
     def calc_drm_rife(_t):
@@ -167,21 +144,22 @@ def make_inference(_I0, _I1, _I2, _scale):
         # To align it with I0 and I2, we need to warp the drm maps.
         # Note: 1. To reverse the direction of the drm map, use 1 - drm and then warp it.
         # 2. For RIFE, drm should be aligned with the time corresponding to the intermediate frame.
-        drm01r = warp(1 - drm10, flow10 * ((1 - drm10) * 2) * _t, metric10, strMode='soft')
-        drm21r = warp(1 - drm12, flow12 * ((1 - drm12) * 2) * _t, metric12, strMode='soft')
+        _drm01r = warp(1 - drm10, flow10 * ((1 - drm10) * 2) * _t, None, strMode='avg')
+        _drm21r = warp(1 - drm12, flow12 * ((1 - drm12) * 2) * _t, None, strMode='avg')
 
-        warped_ones_mask01r = warp(ones_mask, flow10 * ((1 - drm01r) * 2) * _t, metric10, strMode='soft')
-        warped_ones_mask21r = warp(ones_mask, flow12 * ((1 - drm21r) * 2) * _t, metric12, strMode='soft')
+        warped_ones_mask01r = warp(ones_mask, flow10 * ((1 - _drm01r) * 2) * _t, None, strMode='avg')
+        warped_ones_mask21r = warp(ones_mask, flow12 * ((1 - _drm21r) * 2) * _t, None, strMode='avg')
 
         holes01r = warped_ones_mask01r < 0.999
         holes21r = warped_ones_mask21r < 0.999
 
-        drm01r[holes01r] = (1 - drm10)[holes01r]
-        drm21r[holes21r] = (1 - drm12)[holes21r]
+        _drm01r[holes01r] = (1 - drm10)[holes01r]
+        _drm21r[holes21r] = (1 - drm12)[holes21r]
 
-        drm01r, drm21r = map(lambda x: torch.nn.functional.interpolate(x, size=_I0.shape[2:], mode='bilinear',
-                                                                       align_corners=False), [drm01r, drm21r])
-        return drm01r, drm21r
+        _drm01r, _drm21r = map(lambda x: torch.nn.functional.interpolate(x, size=_I0.shape[2:], mode='bilinear',
+                                                                         align_corners=False), [_drm01r, _drm21r])
+
+        return _drm01r, _drm21r
 
     output1, output2 = list(), list()
     _output = list()
