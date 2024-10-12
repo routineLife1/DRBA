@@ -43,8 +43,7 @@ compensation.**
 
 ![rife](https://github.com/user-attachments/assets/e0480165-c748-43ac-ad3c-5e6fb7adea7f)
 
-**If you use FastFlowNet TRT, RIFE v4.22 Lite TRT, and implement the project with VapourSynth, real-time playback can be
-achieved on a reasonably powerful NVIDIA GPU, such as the RTX 3070.**
+**If you use RIFE v4.26 Lite TRT, and implement the project with VapourSynth, real-time playback can be achieved on a reasonably powerful NVIDIA GPU.**
 
 ## gmfss_union(For high-quality output.)
 
