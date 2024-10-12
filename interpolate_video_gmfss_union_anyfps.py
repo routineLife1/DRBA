@@ -146,7 +146,7 @@ def make_inference(_I0, _I1, _I2, minus_t, zero_t, plus_t, _left_scene, _right_s
     reuse_i1i2 = model.reuse(_I1, _I2, scale)
 
     flow10, metric10 = reuse_i1i0[0], reuse_i1i0[2]
-    flow12, metric12 = reuse_i1i2[0], reuse_i1i0[2]
+    flow12, metric12 = reuse_i1i2[0], reuse_i1i2[2]
 
     # Compute the distance using the optical flow and distance calculator
     d10 = distance_calculator(flow10) + 1e-4
