@@ -140,14 +140,19 @@ def make_inference(_I0, _I1, _I2, minus_t, zero_t, plus_t, _left_scene, _right_s
         flow50, flow51 = flow[:, :2], flow[:, 2:]  # only need forward direction flow
         flow05 = warp(flow50, flow50, None, 'avg')
         flow15 = warp(flow51, flow51, None, 'avg')
+
         flow05 = -flow05
         flow15 = -flow15
+
+        _flow01 = flow05 * 2
+        _flow10 = flow15 * 2
+
         # qvi
         # flow05, norm2 = fwarp(flow50, flow50)
         # flow05[norm2]...
         # flow05 = -flow05
 
-        return flow05, flow15
+        return _flow01, _flow10
 
     # Flow distance calculator
     def distance_calculator(_x):
