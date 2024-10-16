@@ -22,7 +22,7 @@ dst_fps = 60  # target fps (at least greater than source video fps)
 global_size = (1920, 1080)  # frame output resolution
 hwaccel = True  # Use hardware acceleration video encoder
 
-enable_scdet = True  # enable scene detection
+enable_scdet = False  # enable scene detection
 scdet_threshold = 100  # scene detection threshold(The smaller the value, the more sensitive)
 
 

@@ -14,14 +14,14 @@ warnings.filterwarnings("ignore")
 from models.rife_426.softsplat import softsplat as warp
 from models.rife_426.IFNet_HDv3 import IFNet
 
-input = r'E:\01.mkv'  # input video path
+input = r'01.mkv'  # input video path
 output = r'D:\tmp\output.mkv'  # output video path
 scale = 1.0  # flow scale
 dst_fps = 60  # target fps (at least greater than source video fps)
 global_size = (1920, 1080)  # frame output resolution
 hwaccel = True  # Use hardware acceleration video encoder
 
-enable_scdet = True  # enable scene detection
+enable_scdet = False  # enable scene detection
 scdet_threshold = 100  # scene detection threshold(The smaller the value, the more sensitive)
 
 
