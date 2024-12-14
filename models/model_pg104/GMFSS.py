@@ -5,10 +5,22 @@ from models.gmflow.gmflow import GMFlow
 from models.model_pg104.MetricNet import MetricNet
 from models.model_pg104.FeatureNet import FeatureNet
 from models.model_pg104.FusionNet import GridNet
-from models.model_pg104.softsplat import softsplat as warp
 
-device = torch.device("cuda")
+HAS_CUDA = True
+try:
+    import cupy
+    if cupy.cuda.get_cuda_path() == None:
+        HAS_CUDA = False
+except Exception:
+    HAS_CUDA = False
 
+if HAS_CUDA:
+    from models.softsplat.softsplat import softsplat as warp
+else:
+    print("System does not have CUDA installed, falling back to PyTorch")
+    from models.softsplat.softsplat_torch import softsplat as warp
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 class Model:
     def __init__(self):
@@ -74,7 +86,7 @@ class Model:
 
         return flow01, flow10, metric0, metric1, feat_ext0, feat_ext1
 
-    def inference(self, img0, img1, reuse_things, timestep):
+    def inference(self, img0, img1, reuse_things, timestep, rife):
         flow01, metric0, feat11, feat12, feat13 = reuse_things[0], reuse_things[2], reuse_things[4][0], reuse_things[4][
             1], reuse_things[4][2]
         flow10, metric1, feat21, feat22, feat23 = reuse_things[1], reuse_things[3], reuse_things[5][0], reuse_things[5][

@@ -1,5 +1,6 @@
 # for study only
 import subprocess
+import argparse
 from queue import Queue
 import cv2
 import _thread
@@ -8,18 +9,48 @@ import torch
 import numpy as np
 import time
 from models.model_nb222.GMFSS import Model
-from models.model_nb222.softsplat import softsplat as warp
 import warnings
 
 warnings.filterwarnings("ignore")
+HAS_CUDA = True
+try:
+    import cupy
 
-input = r'E:\test.mp4'  # input video path
-output = r'D:\tmp\output.mkv'  # output video path
-scale = 1.0  # flow scale
-times = 5  # Must be an integer multiple
-global_size = (1920, 1080)  # frame output resolution
-hwaccel = True  # Use hardware acceleration video encoder
+    if cupy.cuda.get_cuda_path() == None:
+        HAS_CUDA = False
+except Exception:
+    HAS_CUDA = False
 
+if HAS_CUDA:
+    from models.softsplat.softsplat import softsplat as warp
+else:
+    print("System does not have CUDA installed, falling back to PyTorch")
+    from models.softsplat.softsplat_torch import softsplat as warp
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+parser = argparse.ArgumentParser(description='Interpolation a video with AFI-ForwardDeduplicate')
+parser.add_argument('-i', '--input', dest='input', type=str, default='input.mp4', help='absolute path of input video')
+parser.add_argument('-o', '--output', dest='output', type=str, default='output.mp4',
+                    help='absolute path of output video')
+parser.add_argument('-t', '--times', dest='times', type=int, default=2, help='interpolate to ?x fps')
+parser.add_argument('-s', '--enable_scdet', dest='enable_scdet', action='store_true', default=True,
+                    help='enable scene change detection')
+parser.add_argument('-st', '--scdet_threshold', dest='scdet_threshold', type=float, default=0.3,
+                    help='ssim scene detection threshold')
+parser.add_argument('-hw', '--hwaccel', dest='hwaccel', action='store_true', default=True,
+                    help='enable hardware acceleration encode(require nvidia graph card)')
+parser.add_argument('-scale', '--scale', dest='scale', type=float, default=1.0,
+                    help='flow scale, generally use 1.0 with 1080P and 0.5 with 4K resolution')
+args = parser.parse_args()
+
+input = args.input  # input video path
+output = args.output  # output video path
+scale = args.scale  # flow scale
+times = args.times  # Must be an integer multiple
+enable_scdet = args.enable_scdet  # enable scene change detection
+scdet_threshold = args.scdet_threshold  # scene change detection threshold
+hwaccel = args.hwaccel  # Use hardware acceleration video encoder
 
 # deprecated
 # swap_thresh means Threshold for applying the swap mask.
@@ -28,9 +59,12 @@ hwaccel = True  # Use hardware acceleration video encoder
 # 1 means never apply the swap mask.
 # swap_thresh = 1
 
+video_capture = cv2.VideoCapture(input)
+read_fps = video_capture.get(cv2.CAP_PROP_FPS)
+width, height = map(int, map(video_capture.get, [cv2.CAP_PROP_FRAME_WIDTH, cv2.CAP_PROP_FRAME_HEIGHT]))
+
+
 def generate_frame_renderer(input_path, output_path):
-    video_capture = cv2.VideoCapture(input_path)
-    read_fps = video_capture.get(cv2.CAP_PROP_FPS)
     encoder = 'libx264'
     preset = 'medium'
     if hwaccel:
@@ -38,7 +72,7 @@ def generate_frame_renderer(input_path, output_path):
         preset = 'p7'
     ffmpeg_cmd = [
         'ffmpeg', '-y', '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-r', f'{read_fps * times}',
-        '-s', f'{global_size[0]}x{global_size[1]}',
+        '-s', f'{width}x{height}',
         '-i', 'pipe:0', '-i', input_path,
         '-map', '0:v', '-map', '1:a',
         '-c:v', encoder, "-movflags", "+faststart", "-pix_fmt", "yuv420p", "-qp", "16", '-preset', preset,
@@ -63,7 +97,7 @@ model.eval()
 
 
 def to_tensor(img):
-    return torch.from_numpy(img.transpose(2, 0, 1)).unsqueeze(0).float().cuda() / 255.
+    return torch.from_numpy(img.transpose(2, 0, 1)).unsqueeze(0).float().to(device) / 255.
 
 
 def load_image(img, _scale):
@@ -88,7 +122,7 @@ def get():
 def build_read_buffer(r_buffer, v):
     ret, __x = v.read()
     while ret:
-        r_buffer.put(cv2.resize(__x, global_size))
+        r_buffer.put(__x)
         ret, __x = v.read()
     r_buffer.put(None)
 
@@ -99,13 +133,14 @@ def clear_write_buffer(w_buffer):
         item = w_buffer.get()
         if item is None:
             break
-        result = cv2.resize(item, global_size)
+        result = cv2.resize(item, (width, height))
         ffmpeg_writer.stdin.write(np.ascontiguousarray(result[:, :, ::-1]))
     ffmpeg_writer.stdin.close()
     ffmpeg_writer.wait()
 
 
-@torch.autocast(device_type="cuda")
+@torch.inference_mode()
+@torch.autocast(device_type="cuda" if torch.cuda.is_available() else "cpu")
 def make_inference(_I0, _I1, _I2, _scale, _reuse=None):
     # Flow distance calculator
     def distance_calculator(_x):

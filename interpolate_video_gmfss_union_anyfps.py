@@ -1,6 +1,7 @@
 # for high quality output
 import math
 import subprocess
+import argparse
 from queue import Queue
 import cv2
 import _thread
@@ -8,12 +9,30 @@ from tqdm import tqdm
 import torch
 import numpy as np
 import time
-from models.model_pg104.softsplat import softsplat as warp
+from models.pytorch_msssim import ssim_matlab
+from torch.nn import functional as F
 from models.model_pg104.GMFSS import Model
-from models.rife_422_lite.IFNet_HDv3 import IFNet
+from models.rife_426_heavy.IFNet_HDv3 import IFNet
 import warnings
 
 warnings.filterwarnings("ignore")
+
+HAS_CUDA = True
+try:
+    import cupy
+
+    if cupy.cuda.get_cuda_path() == None:
+        HAS_CUDA = False
+except Exception:
+    HAS_CUDA = False
+
+if HAS_CUDA:
+    from models.softsplat.softsplat import softsplat as warp
+else:
+    print("System does not have CUDA installed, falling back to PyTorch")
+    from models.softsplat.softsplat_torch import softsplat as warp
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 input = r'E:\01.mkv'  # input video path
 output = r'D:\tmp\output.mkv'  # output video path
@@ -22,14 +41,16 @@ dst_fps = 60  # target fps (at least greater than source video fps)
 global_size = (1920, 1080)  # frame output resolution
 hwaccel = True  # Use hardware acceleration video encoder
 
-enable_scdet = False  # enable scene detection
-scdet_threshold = 100  # scene detection threshold(The smaller the value, the more sensitive)
+enable_scdet = True  # enable scene detection
+scdet_threshold = 0.3  # scene detection threshold(The smaller the value, the more sensitive)
 
 
 def check_scene(x1, x2):
     if not enable_scdet:
         return False
-    return np.abs(x1 - x2).mean() > scdet_threshold
+    x1 = F.interpolate(x1, (32, 32), mode='bilinear', align_corners=False)
+    x2 = F.interpolate(x2, (32, 32), mode='bilinear', align_corners=False)
+    return ssim_matlab(x1, x2) < scdet_threshold
 
 
 class TMapper:
@@ -49,6 +70,10 @@ class TMapper:
         return [_i / self.times for _i in range(_start, _end)]
 
 
+video_capture = cv2.VideoCapture(input)
+width, height = map(int, map(video_capture.get, [cv2.CAP_PROP_FRAME_WIDTH, cv2.CAP_PROP_FRAME_HEIGHT]))
+
+
 def generate_frame_renderer(input_path, output_path):
     encoder = 'libx264'
     preset = 'medium'
@@ -57,7 +82,7 @@ def generate_frame_renderer(input_path, output_path):
         preset = 'p7'
     ffmpeg_cmd = [
         'ffmpeg', '-y', '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-r', f'{dst_fps}',
-        '-s', f'{global_size[0]}x{global_size[1]}',
+        '-s', f'{width}x{height}',
         '-i', 'pipe:0', '-i', input_path,
         '-map', '0:v', '-map', '1:a',
         '-c:v', encoder, "-movflags", "+faststart", "-pix_fmt", "yuv420p", "-qp", "16", '-preset', preset,
@@ -85,7 +110,7 @@ def convert(param):
 
 
 ifnet = IFNet().to(device).eval()
-ifnet.load_state_dict(convert(torch.load(r'weights\train_log_rife_422_lite\flownet.pkl', map_location='cpu')), False)
+ifnet.load_state_dict(convert(torch.load(r'weights\train_log_rife_426\flownet.pkl', map_location='cpu')), False)
 model = Model()
 model.load_model(r'weights\train_log_pg104', -1)
 model.device()
@@ -93,7 +118,7 @@ model.eval()
 
 
 def to_tensor(img):
-    return torch.from_numpy(img.transpose(2, 0, 1)).unsqueeze(0).float().cuda() / 255.
+    return torch.from_numpy(img.transpose(2, 0, 1)).unsqueeze(0).float().to(device) / 255.
 
 
 def load_image(img, _scale):
@@ -118,7 +143,7 @@ def get():
 def build_read_buffer(r_buffer, v):
     ret, __x = v.read()
     while ret:
-        r_buffer.put(cv2.resize(__x, global_size))
+        r_buffer.put(__x)
         ret, __x = v.read()
     r_buffer.put(None)
 
@@ -129,13 +154,14 @@ def clear_write_buffer(w_buffer):
         item = w_buffer.get()
         if item is None:
             break
-        result = cv2.resize(item, global_size)
+        result = cv2.resize(item, (width, height))
         ffmpeg_writer.stdin.write(np.ascontiguousarray(result[:, :, ::-1]))
     ffmpeg_writer.stdin.close()
     ffmpeg_writer.wait()
 
 
-@torch.autocast(device_type="cuda")
+@torch.inference_mode()
+@torch.autocast(device_type="cuda" if torch.cuda.is_available() else "cpu")
 def make_inference(_I0, _I1, _I2, minus_t, zero_t, plus_t, _left_scene, _right_scene, _scale, _reuse=None):
     # Flow distance calculator
     def distance_calculator(_x):
@@ -218,7 +244,7 @@ def make_inference(_I0, _I1, _I2, minus_t, zero_t, plus_t, _left_scene, _right_s
         if not disable_drm:
             drm01r, _ = calc_drm_rife(t)
         I10 = ifnet(torch.cat((f_I1, f_I0), 1), timestep=t * (2 * drm01r),
-                    scale_list=[8 / scale, 4 / scale, 2 / scale, 1 / scale])
+                    scale_list=[16 / scale, 8 / scale, 4 / scale, 2 / scale, 1 / scale])[0]
         output1.append(model.inference_t2(_I1, _I0, reuse_i1i0, timestep0=t * (2 * (1 - drm10)),
                                           timestep1=1 - t * (2 * drm01), rife=I10))
     for _ in zero_t:
@@ -227,7 +253,7 @@ def make_inference(_I0, _I1, _I2, minus_t, zero_t, plus_t, _left_scene, _right_s
         if not disable_drm:
             _, drm21r = calc_drm_rife(t)
         I12 = ifnet(torch.cat((f_I1, f_I2), 1), timestep=t * (2 * drm21r),
-                    scale_list=[8 / scale, 4 / scale, 2 / scale, 1 / scale])
+                    scale_list=[16 / scale, 8 / scale, 4 / scale, 2 / scale, 1 / scale])[0]
         output2.append(model.inference_t2(_I1, _I2, reuse_i1i2, timestep0=t * (2 * (1 - drm12)),
                                           timestep1=1 - t * (2 * drm21), rife=I12))
 
@@ -243,7 +269,6 @@ def make_inference(_I0, _I1, _I2, minus_t, zero_t, plus_t, _left_scene, _right_s
     return _output, _reuse
 
 
-video_capture = cv2.VideoCapture(input)
 src_fps = video_capture.get(cv2.CAP_PROP_FPS)
 assert dst_fps > src_fps, 'dst fps should be greater than src fps'
 total_frames_count = video_capture.get(7)
@@ -274,7 +299,7 @@ def calc_t(_idx):
 
 # head
 mt, zt, pt = calc_t(idx)
-right_scene = check_scene(i0, i1)
+right_scene = check_scene(I0, I1)
 left_scene = right_scene
 output, reuse = make_inference(I0, I0, I1, mt, zt, pt, False, right_scene, scale, None)
 for x in output:
@@ -288,7 +313,7 @@ while True:
     I2 = load_image(i2, scale)
 
     mt, zt, pt = calc_t(idx)
-    right_scene = check_scene(i1, i2)
+    right_scene = check_scene(I1, I2)
     output, reuse = make_inference(I0, I1, I2, mt, zt, pt, left_scene, right_scene, scale, reuse)
     for x in output:
         put(x)

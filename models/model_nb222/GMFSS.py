@@ -7,10 +7,22 @@ from models.gmflow.gmflow import GMFlow
 from models.model_nb222.MetricNet import MetricNet
 from models.model_nb222.FeatureNet import FeatureNet
 from models.model_nb222.FusionNet import GridNet
-from models.model_nb222.softsplat import softsplat as warp
 
-device = torch.device("cuda")
+HAS_CUDA = True
+try:
+    import cupy
+    if cupy.cuda.get_cuda_path() == None:
+        HAS_CUDA = False
+except Exception:
+    HAS_CUDA = False
 
+if HAS_CUDA:
+    from models.softsplat.softsplat import softsplat as warp
+else:
+    print("System does not have CUDA installed, falling back to PyTorch")
+    from models.softsplat.softsplat_torch import softsplat as warp
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 class Model:
     def __init__(self):
@@ -46,7 +58,7 @@ class Model:
                 if "module." in k
             }
 
-        self.flownet.load_state_dict(torch.load('{}/rife.pkl'.format(path), map_location='cpu'))
+        self.flownet.load_state_dict(torch.load('{}/flownet.pkl'.format(path), map_location='cpu'))
         self.metricnet.load_state_dict(torch.load('{}/metric.pkl'.format(path), map_location='cpu'))
         self.feat_ext.load_state_dict(torch.load('{}/feat.pkl'.format(path), map_location='cpu'))
         self.fusionnet.load_state_dict(torch.load('{}/fusionnet.pkl'.format(path), map_location='cpu'))
