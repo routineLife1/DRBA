@@ -7,6 +7,8 @@
 > thereby preserving the original pace and integrity of the characters while avoiding distortions common in frame
 > interpolation.
 
+### 📘[中文文档](README_CN.md)
+
 # 👀Demo
 
 ## input
@@ -14,13 +16,13 @@
 ## output
 ![output](https://github.com/hyw-dev/FCLAFI/assets/68835291/5138f267-6904-42ce-9551-b0891812a650)
 
-# 👀Demos Videos
+# 👀Demos Videos(BiliBili)
+
+**[Sousou no Frieren NCOP1](https://www.bilibili.com/video/BV12QsaeREmr/?share_source=copy_web&vd_source=8a8926eb0f1d5f0f1cab7529c8f51282)**
+
+**[Sousou no Frieren NCOP2](https://www.bilibili.com/video/BV1RYs8eFE77/?share_source=copy_web&vd_source=8a8926eb0f1d5f0f1cab7529c8f51282)**
 
 **[OP「つよがるガール」](https://www.bilibili.com/video/BV1uJtPe9EdY/?share_source=copy_web&vd_source=8a8926eb0f1d5f0f1cab7529c8f51282)**
-
-**[葬送的芙莉莲 NCOP1「勇者」](https://www.bilibili.com/video/BV12QsaeREmr/?share_source=copy_web&vd_source=8a8926eb0f1d5f0f1cab7529c8f51282)**
-
-**[葬送的芙莉莲 NCOP2「放晴」](https://www.bilibili.com/video/BV1RYs8eFE77/?share_source=copy_web&vd_source=8a8926eb0f1d5f0f1cab7529c8f51282)**
 
 ## 🔧Installation
 
@@ -52,14 +54,14 @@ Usage: python interpolate_video_rife_anyfps.py -i in_video -o out_video [options
   -s enable_scdet      enable scene change detection (default Enable)
   -st scdet_threshold  ssim scene detection threshold (default=0.3)
   -hw hwaccel          enable hardware acceleration encode (default Enable) (require nvidia graph card)
-  -s scale             scale factor (default=1.0) flow scale, generally use 1.0 with 1080P and 0.5 with 4K resolution
+  -s scale             flow scale factor (default=1.0), generally use 1.0 with 1080P and 0.5 with 4K resolution
 ```
 
 - input accept absolute video file path. Example: E:/input.mp4
 - output accept absolute video file path. Example: E:/output.mp4
 - dst_fps = target interpolated video frame rate. Example: 60
 - enable_scdet = enable scene change detection.
-- scdet_threshold = scene change detection threshold. The smaller the value, the more sensitive the detection.
+- scdet_threshold = scene change detection threshold. The larger the value, the more sensitive the detection.
 - hwaccel = enable hardware acceleration during encoding output video.
 - scale = flow scale factor. Decrease this value to reduce the computational difficulty of the model at higher resolutions. Generally, use 1.0 for 1080P and 0.5 for 4K resolution.
 
@@ -82,3 +84,8 @@ compensation.**
 **Combining the strengths of both RIFE and GMFSS, it delivers outstanding results.**
 
 ![gmfss](https://github.com/user-attachments/assets/5a4ca540-ddfa-4a93-ab21-e39eb9299e89)
+
+# 🔗Reference
+Optical Flow: [GMFlow](https://github.com/haofeixu/gmflow)
+
+Video Interpolation: [Practical-RIFE](https://github.com/hzwer/Practical-RIFE) [GMFSS](https://github.com/98mxr/GMFSS_Fortuna)
