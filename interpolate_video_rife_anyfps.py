@@ -122,7 +122,7 @@ def convert(param):
 
 
 ifnet = IFNet().to(device).eval()
-ifnet.load_state_dict(convert(torch.load(r'weights/train_log_rife_426_heavy/flownet.pkl', map_location='cpu')), False)
+ifnet.load_state_dict(convert(torch.load(r'weights/train_log_rife_426_heavy/flownet.pkl', map_location='cpu')), True)
 flownet = ifnet
 
 
@@ -278,6 +278,9 @@ def make_inference(_I0, _I1, _I2, minus_t, zero_t, plus_t, _left_scene, _right_s
 
     for t in minus_t:
         t = -t
+        if t == 1:
+            output1.append(_I0)
+            continue
         if not disable_drm:
             drm01r, _ = calc_drm_rife(t)
         output1.append(ifnet(torch.cat((_I1, _I0), 1), timestep=t * (2 * drm01r),
@@ -285,6 +288,9 @@ def make_inference(_I0, _I1, _I2, minus_t, zero_t, plus_t, _left_scene, _right_s
     for _ in zero_t:
         output1.append(_I1)
     for t in plus_t:
+        if t == 1:
+            output2.append(_I2)
+            continue
         if not disable_drm:
             _, drm21r = calc_drm_rife(t)
         output2.append(ifnet(torch.cat((_I1, _I2), 1), timestep=t * (2 * drm21r),

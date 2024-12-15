@@ -319,7 +319,7 @@ def make_inference(_I0, _I1, _I2, minus_t, zero_t, plus_t, _left_scene, _right_s
 
     for t in plus_t:
         if t == 1:
-            output1.append(_I2)
+            output2.append(_I2)
             continue
         if not disable_drm:
             _, drm21r = calc_drm_rife(t)
