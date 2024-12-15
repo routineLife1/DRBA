@@ -122,7 +122,7 @@ def convert(param):
 
 
 ifnet = IFNet().to(device).eval()
-ifnet.load_state_dict(convert(torch.load(r'weights/train_log_rife_426_heavy/flownet.pkl', map_location='cpu')), False)
+ifnet.load_state_dict(convert(torch.load(r'weights/train_log_rife_426_heavy/flownet.pkl', map_location='cpu')), True)
 flownet = ifnet
 
 
