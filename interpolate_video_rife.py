@@ -16,6 +16,7 @@ warnings.filterwarnings("ignore")
 HAS_CUDA = True
 try:
     import cupy
+
     if cupy.cuda.get_cuda_path() == None:
         HAS_CUDA = False
 except Exception:
@@ -45,6 +46,10 @@ output = args.output  # output video path
 scale = args.scale  # flow scale
 times = args.times  # Must be an integer multiple
 hwaccel = args.hwaccel  # Use hardware acceleration video encoder
+
+video_capture = cv2.VideoCapture(input)
+read_fps = video_capture.get(cv2.CAP_PROP_FPS)
+width, height = map(int, map(video_capture.get, [cv2.CAP_PROP_FRAME_WIDTH, cv2.CAP_PROP_FRAME_HEIGHT]))
 
 
 def generate_frame_renderer(input_path, output_path):
@@ -131,6 +136,7 @@ def clear_write_buffer(w_buffer):
     ffmpeg_writer.stdin.close()
     ffmpeg_writer.wait()
 
+
 @torch.inference_mode()
 @torch.autocast(device_type="cuda" if torch.cuda.is_available() else "cpu")
 def make_inference(_I0, _I1, _I2, _scale, _reuse):
@@ -214,7 +220,8 @@ def make_inference(_I0, _I1, _I2, _scale, _reuse):
         _drm21r_p[holes21r] = (1 - _drm21r_p)[holes21r]
 
         _drm01r_p, _drm21r_p = map(lambda x: torch.nn.functional.interpolate(x, size=_I0.shape[2:], mode='bilinear',
-                                                                         align_corners=False), [_drm01r_p, _drm21r_p])
+                                                                             align_corners=False),
+                                   [_drm01r_p, _drm21r_p])
 
         return _drm01r_p, _drm21r_p
 
@@ -255,7 +262,6 @@ def make_inference(_I0, _I1, _I2, _scale, _reuse):
     return _output, (flow21_p, flow12_p, flow21_s, flow12_s)
 
 
-video_capture = cv2.VideoCapture(input)
 total_frames_count = video_capture.get(7)
 pbar = tqdm(total=total_frames_count)
 read_buffer = Queue(maxsize=100)
