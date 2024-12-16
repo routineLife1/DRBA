@@ -7,14 +7,19 @@
 > thereby preserving the original pace and integrity of the characters while avoiding distortions common in frame
 > interpolation.
 
+## 📖Overview
+DRBA consists two parts('DRM Calculation' and 'Applying DRM to Frame Interpolation') to generate the adjusted in-between anime frame given three inputs.
+![Overview](assert/Overview.png)
+
+
 ### 📘[中文文档](README_CN.md)
 
 # 👀Demo
 
 ## input
-![input](https://github.com/hyw-dev/FCLAFI/assets/68835291/cc9fb083-0f8d-48e1-b33e-0a893f313329)
+![input](assert/input.gif)
 ## output
-![output](https://github.com/hyw-dev/FCLAFI/assets/68835291/5138f267-6904-42ce-9551-b0891812a650)
+![output](assert/output.gif)
 
 # 👀Demos Videos(BiliBili)
 
@@ -75,7 +80,7 @@ The explanation of the algorithm's principles has not been organized yet. You ma
 **Due to the limitations of the RIFE algorithm's performance, some distortion may occur in the background during
 compensation.**
 
-![rife](https://github.com/user-attachments/assets/e0480165-c748-43ac-ad3c-5e6fb7adea7f)
+![rife](assert/rife.png)
 
 **If you use RIFE v4.26 TRT, and implement the project with VapourSynth, real-time playback can be achieved on a reasonably powerful NVIDIA GPU.**
 
@@ -83,7 +88,7 @@ compensation.**
 
 **Combining the strengths of both RIFE and GMFSS, it delivers outstanding results.**
 
-![gmfss](https://github.com/user-attachments/assets/5a4ca540-ddfa-4a93-ab21-e39eb9299e89)
+![gmfss](assert/gmfss.png)
 
 # 🔗Reference
 Optical Flow: [GMFlow](https://github.com/haofeixu/gmflow)
