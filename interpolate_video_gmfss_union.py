@@ -31,7 +31,7 @@ else:
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-parser = argparse.ArgumentParser(description='Interpolation a video with AFI-ForwardDeduplicate')
+parser = argparse.ArgumentParser(description='Interpolation a video with DRBA')
 parser.add_argument('-i', '--input', dest='input', type=str, default='input.mp4', help='absolute path of input video')
 parser.add_argument('-o', '--output', dest='output', type=str, default='output.mp4',
                     help='absolute path of output video')

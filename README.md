@@ -59,7 +59,7 @@ Usage: python interpolate_video_rife_anyfps.py -i in_video -o out_video [options
   -s enable_scdet      enable scene change detection (default Enable)
   -st scdet_threshold  ssim scene detection threshold (default=0.3)
   -hw hwaccel          enable hardware acceleration encode (default Enable) (require nvidia graph card)
-  -s scale             flow scale factor (default=1.0), generally use 1.0 with 1080P and 0.5 with 4K resolution
+  -scale scale         flow scale factor (default=1.0), generally use 1.0 with 1080P and 0.5 with 4K resolution
 ```
 
 - input accept absolute video file path. Example: E:/input.mp4

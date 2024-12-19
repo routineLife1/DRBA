@@ -34,15 +34,28 @@ else:
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-input = r'E:\01.mkv'  # input video path
-output = r'D:\tmp\output.mkv'  # output video path
-scale = 1.0  # flow scale
-dst_fps = 60  # target fps (at least greater than source video fps)
-global_size = (1920, 1080)  # frame output resolution
-hwaccel = True  # Use hardware acceleration video encoder
+parser = argparse.ArgumentParser(description='Interpolation a video with DRBA')
+parser.add_argument('-i', '--input', dest='input', type=str, default='input.mp4', help='absolute path of input video')
+parser.add_argument('-o', '--output', dest='output', type=str, default='output.mp4',
+                    help='absolute path of output video')
+parser.add_argument('-fps', '--dst_fps', dest='dst_fps', type=float, default=60, help='interpolate to ? fps')
+parser.add_argument('-s', '--enable_scdet', dest='enable_scdet', action='store_true', default=True,
+                    help='enable scene change detection')
+parser.add_argument('-st', '--scdet_threshold', dest='scdet_threshold', type=float, default=0.3,
+                    help='ssim scene detection threshold')
+parser.add_argument('-hw', '--hwaccel', dest='hwaccel', action='store_true', default=True,
+                    help='enable hardware acceleration encode(require nvidia graph card)')
+parser.add_argument('-scale', '--scale', dest='scale', type=float, default=1.0,
+                    help='flow scale, generally use 1.0 with 1080P and 0.5 with 4K resolution')
+args = parser.parse_args()
 
-enable_scdet = True  # enable scene detection
-scdet_threshold = 0.3  # scene detection threshold(The smaller the value, the more sensitive)
+input = args.input  # input video path
+output = args.output  # output video path
+scale = args.scale  # flow scale
+dst_fps = args.dst_fps  # Must be an integer multiple
+enable_scdet = args.enable_scdet  # enable scene change detection
+scdet_threshold = args.scdet_threshold  # scene change detection threshold
+hwaccel = args.hwaccel  # Use hardware acceleration video encoder
 
 
 def check_scene(x1, x2):
