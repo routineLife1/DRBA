@@ -238,9 +238,8 @@ def make_inference(_I0, _I1, _I2, minus_t, zero_t, plus_t, _left_scene, _right_s
     output1, output2 = list(), list()
 
     if _left_scene:
-        for _ in minus_t:
-            zero_t = np.append(zero_t, 0)
-        minus_t = list()
+        for i in range(len(minus_t)):
+            minus_t[i] = -1
 
     if _right_scene:
         for _ in plus_t:
@@ -254,6 +253,9 @@ def make_inference(_I0, _I1, _I2, minus_t, zero_t, plus_t, _left_scene, _right_s
 
     for t in minus_t:
         t = -t
+        if t == 1:
+            output1.append(_I0)
+            continue
         if not disable_drm:
             drm01r, _ = calc_drm_rife(t)
         I10 = ifnet(torch.cat((f_I1, f_I0), 1), timestep=t * (2 * drm01r),
@@ -262,7 +264,12 @@ def make_inference(_I0, _I1, _I2, minus_t, zero_t, plus_t, _left_scene, _right_s
                                           timestep1=1 - t * (2 * drm01), rife=I10))
     for _ in zero_t:
         output1.append(_I1)
+
     for t in plus_t:
+        if t == 1:  # Following the principle of left-closed, right-open, the logic of this line of code will not be triggered.
+            # assert True
+            output2.append(_I2)
+            continue
         if not disable_drm:
             _, drm21r = calc_drm_rife(t)
         I12 = ifnet(torch.cat((f_I1, f_I2), 1), timestep=t * (2 * drm21r),

@@ -214,9 +214,8 @@ def make_inference(_I0, _I1, _I2, minus_t, zero_t, plus_t, _left_scene, _right_s
     output1, output2 = list(), list()
 
     if _left_scene:
-        for _ in minus_t:
-            zero_t = np.append(zero_t, 0)
-        minus_t = list()
+        for i in range(len(minus_t)):
+            minus_t[i] = -1
 
     if _right_scene:
         for _ in plus_t:
@@ -228,11 +227,20 @@ def make_inference(_I0, _I1, _I2, minus_t, zero_t, plus_t, _left_scene, _right_s
 
     for t in minus_t:
         t = -t
+        if t == 1:
+            output1.append(_I0)
+            continue
         output1.append(model.inference_t2(_I1, _I0, reuse_i1i0, timestep0=t * (2 * (1 - drm10)),
                                           timestep1=1 - t * (2 * drm01)))
     for _ in zero_t:
         output1.append(_I1)
+
     for t in plus_t:
+        if t == 1:  # Following the principle of left-closed, right-open, the logic of this line of code will not be triggered.
+            # assert True
+            output2.append(_I2)
+            continue
+
         output2.append(model.inference_t2(_I1, _I2, reuse_i1i2, timestep0=t * (2 * (1 - drm12)),
                                           timestep1=1 - t * (2 * drm21)))
 

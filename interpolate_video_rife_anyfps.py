@@ -260,9 +260,8 @@ def make_inference(_I0, _I1, _I2, minus_t, zero_t, plus_t, _left_scene, _right_s
     output1, output2 = list(), list()
 
     if _left_scene:
-        for _ in minus_t:
-            zero_t = np.append(zero_t, 0)
-        minus_t = list()
+        for i in range(len(minus_t)):
+            minus_t[i] = -1
 
     if _right_scene:
         for _ in plus_t:
@@ -287,8 +286,10 @@ def make_inference(_I0, _I1, _I2, minus_t, zero_t, plus_t, _left_scene, _right_s
                              scale_list=[16 / scale, 8 / scale, 4 / scale, 2 / scale, 1 / scale])[0])
     for _ in zero_t:
         output1.append(_I1)
+
     for t in plus_t:
-        if t == 1:
+        if t == 1:  # Following the principle of left-closed, right-open, the logic of this line of code will not be triggered.
+            # assert True
             output2.append(_I2)
             continue
         if not disable_drm:
