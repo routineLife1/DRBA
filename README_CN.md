@@ -34,16 +34,17 @@ requirement中包含cupy包依赖, 该包用于加速计算。如果安装遇到
 **视频补帧**
 ```bash
   # 速度优先(致力于实时播放)
-  python interpolate_video_rife_anyfps.py -i input.mp4 -o output.mp4 -fps 60 -scale 1.0 -s -st 0.3 -hw
+  python infer_anyfps_v1.py -m rife -i input.mp4 -o output.mp4 -fps 60 -scale 1.0 -s -st 0.3 -hw
   # 质量优先
-  python interpolate_video_gmfss_union_anyfps.py -i input.mp4 -o output.mp4 -fps 60 -scale 1.0 -s -st 0.3 -hw
+  python infer_anyfps_v1.py -m gmfss_union -i input.mp4 -o output.mp4 -fps 60 -scale 1.0 -s -st 0.3 -hw
 ```
 
 **完整用法**
 ```bash
-Usage: python interpolate_video_rife_anyfps.py -i in_video -o out_video [options]...
+Usage: python infer_anyfps_v1.py -m model -i in_video -o out_video [options]...
        
   -h                   展示此帮助信息
+  -m model             选择使用的模型 (目前支持: rife, gmfss, gmfss_union) (默认为rife)
   -i input             输入视频的绝对路径(例: E:/input.mp4)
   -o output            输出视频的绝对路径(例: E:/input.mp4)
   -fps dst_fps         导出视频的目标帧率 (默认为60)

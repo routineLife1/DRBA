@@ -43,16 +43,17 @@ The cupy package is included in the requirements, but its installation is option
 **Video Interpolation**
 ```bash
   # For speed preference
-  python interpolate_video_rife_anyfps.py -i input.mp4 -o output.mp4 -fps 60 -scale 1.0 -s -st 0.3 -hw
+  python infer_anyfps_v1.py -m rife -i input.mp4 -o output.mp4 -fps 60 -scale 1.0 -s -st 0.3 -hw
   # For quality preference
-  python interpolate_video_gmfss_union_anyfps.py -i input.mp4 -o output.mp4 -fps 60 -scale 1.0 -s -st 0.3 -hw
+  python infer_anyfps_v1.py -m gmfss_union -i input.mp4 -o output.mp4 -fps 60 -scale 1.0 -s -st 0.3 -hw
 ```
 
 **Full Usage**
 ```bash
-Usage: python interpolate_video_rife_anyfps.py -i in_video -o out_video [options]...
+Usage: python infer_anyfps_v1.py -m model -i in_video -o out_video [options]...
        
   -h                   show this help
+  -m model             model name (rife, gmfss, gmfss_union) (default=rife)
   -i input             input video path (absolute path of output video)
   -o output            output video path (absolute path of output video)
   -fps dst_fps         target frame rate (default=60)
@@ -62,6 +63,7 @@ Usage: python interpolate_video_rife_anyfps.py -i in_video -o out_video [options
   -scale scale         flow scale factor (default=1.0), generally use 1.0 with 1080P and 0.5 with 4K resolution
 ```
 
+- model accept model name. Current support: rife, gmfss, gmfss_union
 - input accept absolute video file path. Example: E:/input.mp4
 - output accept absolute video file path. Example: E:/output.mp4
 - dst_fps = target interpolated video frame rate. Example: 60
