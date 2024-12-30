@@ -87,8 +87,8 @@ def convert(param):
 
 
 class TMapper:
-    def __init__(self, src=-1., dst=0., times=None):
-        self.times = dst / src if times is None else times
+    def __init__(self, src=-1., dst=0., times=-1):
+        self.times = dst / src if times == -1 else times
         self.now_step = -1
 
     def get_range_timestamps(self, _min: float, _max: float, lclose=True, rclose=False, normalize=True) -> list:
