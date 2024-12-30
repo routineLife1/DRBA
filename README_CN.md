@@ -57,7 +57,7 @@ Usage: python infer_anyfps_v1.py -m model -i in_video -o out_video [options]...
 - scdet_threshold: 转场识别阈值. 该数值越大, 识别越敏感
 - scale: 光流缩放尺度. 缩小该值可以降低网络在处理大分辨率时的复杂度.
 
-# 📖版本对比
+# 📖模型对比
 
 ## gmfss(仅供学习参考)
 对于该算法的实现原理还未整理完成, 如果有任何疑问可以先在issue中提出

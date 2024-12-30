@@ -72,7 +72,7 @@ Usage: python infer_anyfps_v1.py -m model -i in_video -o out_video [options]...
 - hwaccel = enable hardware acceleration during encoding output video.
 - scale = flow scale factor. Decrease this value to reduce the computational difficulty of the model at higher resolutions. Generally, use 1.0 for 1080P and 0.5 for 4K resolution.
 
-# 📖Version Comparison
+# 📖Model Comparison
 
 ## gmfss(For learning and reference only.)
 The explanation of the algorithm's principles has not been organized yet. You may reach out in issue if you have any questions regarding the details for now.
