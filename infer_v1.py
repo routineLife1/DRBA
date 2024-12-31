@@ -55,7 +55,8 @@ def load_model(model_type):
 def inference():
     video_io = VideoFI_IO(input_path, output_path, dst_fps=dst_fps, times=-1, hwaccel=hwaccel)
     src_fps = video_io.src_fps
-    assert dst_fps > src_fps, 'dst fps should be greater than src fps'
+    if dst_fps > src_fps:
+        raise ValueError(f'dst fps should be greater than src fps, but got dst_fps={dst_fps} and src_fps={src_fps}')
     pbar = tqdm(total=video_io.total_frames_count)
 
     # start inference
@@ -72,18 +73,25 @@ def inference():
     def calc_t(_idx: float):
         timestamp = np.array(
             t_mapper.get_range_timestamps(_idx - 0.5, _idx + 0.5, lclose=True, rclose=False, normalize=False))
-        vfi_timestamp = np.round(timestamp - _idx, 4)
+        vfi_timestamp = np.round(timestamp - _idx, 4) + 1  # [0.5, 1.5)
 
-        minus_t = vfi_timestamp[vfi_timestamp < 0]
-        zero_t = vfi_timestamp[vfi_timestamp == 0]
-        plus_t = vfi_timestamp[vfi_timestamp > 0]
-        return minus_t, zero_t, plus_t
+        return vfi_timestamp
 
     # head
-    mt, zt, pt = calc_t(idx)
+    ts = calc_t(idx)
     left_scene = check_scene(I0, I1, scdet_threshold) if enable_scdet else False
     right_scene = left_scene
-    output, reuse = model.inference_timestamps(I0, I0, I1, mt, zt, pt, False, right_scene, None)
+    reuse = None
+
+    if right_scene:
+        output = [I0 for _ in ts]
+    else:
+        left_ts = ts[ts < 1]
+        right_ts = ts[ts >= 1] - 1
+
+        output = [I0 for _ in left_ts]
+        output.extend(model.inference_ts(I0, I1, right_ts))
+
     for x in output:
         video_io.write_frame(to_out(x, src_size))
     pbar.update(1)
@@ -94,9 +102,33 @@ def inference():
             break
         I2 = to_inp(i2, dst_size)
 
-        mt, zt, pt = calc_t(idx)
+        ts = calc_t(idx)
         right_scene = check_scene(I1, I2, scdet_threshold) if enable_scdet else False
-        output, reuse = model.inference_timestamps(I0, I1, I2, mt, zt, pt, left_scene, right_scene, reuse)
+
+        # If a scene transition occurs between the three frames, then the calculation of this DRM is meaningless.
+        if left_scene and right_scene:  # scene transition occurs at I0~I1, also occurs at I1~I2
+            output = [I1 for _ in ts]
+            reuse = None
+
+        elif left_scene and not right_scene:  # scene transition occurs at I0~I1
+            left_ts = ts[ts < 1]
+            right_ts = ts[ts >= 1] - 1
+            reuse = None
+
+            output = [I1 for _ in left_ts]
+            output.extend(model.inference_ts(I1, I2, right_ts))
+
+        elif not left_scene and right_scene:  # scene transition occurs at I1~I2
+            left_ts = ts[ts <= 1]
+            right_ts = ts[ts > 1] - 1
+            reuse = None
+
+            output = model.inference_ts(I0, I1, left_ts)
+            output.extend([I1 for _ in right_ts])
+
+        else:  # no scene transition
+            output, reuse = model.inference_ts_drba(I0, I1, I2, ts, reuse)
+
         for x in output:
             video_io.write_frame(to_out(x, src_size))
 
@@ -106,9 +138,13 @@ def inference():
         idx += 1
         pbar.update(1)
 
-    # tail(At the end, i0 and i1 have moved to the positions of index -2 and -1 frames.)
-    mt, zt, pt = calc_t(idx)
-    output, _ = model.inference_timestamps(I0, I1, I1, mt, zt, pt, left_scene, False, reuse)
+    # tail
+    ts = calc_t(idx)
+    left_ts = ts[ts <= 1]
+    right_ts = ts[ts > 1] - 1
+
+    output = model.inference_ts(I0, I1, left_ts)
+    output.extend([I1 for _ in right_ts])
 
     for x in output:
         video_io.write_frame(to_out(x, src_size))

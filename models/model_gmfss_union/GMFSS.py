@@ -77,53 +77,11 @@ class Model:
 
         return flow01, flow10, metric0, metric1, feat_ext0, feat_ext1
 
-    # def inference(self, img0, img1, reuse_things, timestep, rife):
-    #     flow01, metric0, feat11, feat12, feat13 = reuse_things[0], reuse_things[2], reuse_things[4][0], reuse_things[4][
-    #         1], reuse_things[4][2]
-    #     flow10, metric1, feat21, feat22, feat23 = reuse_things[1], reuse_things[3], reuse_things[5][0], reuse_things[5][
-    #         1], reuse_things[5][2]
-    #
-    #     F1t = timestep * flow01
-    #     F2t = (1 - timestep) * flow10
-    #
-    #     Z1t = timestep * metric0
-    #     Z2t = (1 - timestep) * metric1
-    #
-    #     img0 = F.interpolate(img0, scale_factor=0.5, mode="bilinear", align_corners=False)
-    #     I1t = warp(img0, F1t, Z1t, strMode='soft')
-    #     img1 = F.interpolate(img1, scale_factor=0.5, mode="bilinear", align_corners=False)
-    #     I2t = warp(img1, F2t, Z2t, strMode='soft')
-    #
-    #     feat1t1 = warp(feat11, F1t, Z1t, strMode='soft')
-    #     feat2t1 = warp(feat21, F2t, Z2t, strMode='soft')
-    #
-    #     F1td = F.interpolate(F1t, scale_factor=0.5, mode="bilinear", align_corners=False) * 0.5
-    #     Z1d = F.interpolate(Z1t, scale_factor=0.5, mode="bilinear", align_corners=False)
-    #     feat1t2 = warp(feat12, F1td, Z1d, strMode='soft')
-    #     F2td = F.interpolate(F2t, scale_factor=0.5, mode="bilinear", align_corners=False) * 0.5
-    #     Z2d = F.interpolate(Z2t, scale_factor=0.5, mode="bilinear", align_corners=False)
-    #     feat2t2 = warp(feat22, F2td, Z2d, strMode='soft')
-    #
-    #     F1tdd = F.interpolate(F1t, scale_factor=0.25, mode="bilinear", align_corners=False) * 0.25
-    #     Z1dd = F.interpolate(Z1t, scale_factor=0.25, mode="bilinear", align_corners=False)
-    #     feat1t3 = warp(feat13, F1tdd, Z1dd, strMode='soft')
-    #     F2tdd = F.interpolate(F2t, scale_factor=0.25, mode="bilinear", align_corners=False) * 0.25
-    #     Z2dd = F.interpolate(Z2t, scale_factor=0.25, mode="bilinear", align_corners=False)
-    #     feat2t3 = warp(feat23, F2tdd, Z2dd, strMode='soft')
-    #
-    #     out = self.fusionnet(torch.cat([I1t, rife, I2t], dim=1), torch.cat([feat1t1, feat2t1], dim=1),
-    #                          torch.cat([feat1t2, feat2t2], dim=1), torch.cat([feat1t3, feat2t3], dim=1))
-    #
-    #     return torch.clamp(out, 0, 1)
-
     def inference(self, img0, img1, reuse_things, timestep0, timestep1, rife):
         flow01, metric0, feat11, feat12, feat13 = reuse_things[0], reuse_things[2], reuse_things[4][0], reuse_things[4][
             1], reuse_things[4][2]
         flow10, metric1, feat21, feat22, feat23 = reuse_things[1], reuse_things[3], reuse_things[5][0], reuse_things[5][
             1], reuse_things[5][2]
-
-        timestep0 = torch.clamp(timestep0, 0, 1)
-        timestep1 = torch.clamp(timestep1, 0, 1)
 
         F1t = timestep0 * flow01
         F2t = timestep1 * flow10
@@ -182,3 +140,42 @@ class Model:
         # cv2.imwrite(r"E:\Work\VFI\Algorithm\FCLAFI\output\wt1.png", wtimestep1[0].permute(1, 2, 0).cpu().numpy() * 255)
 
         return torch.clamp(out, 0, 1)
+
+    # def inference(self, img0, img1, reuse_things, timestep, rife):
+    #     flow01, metric0, feat11, feat12, feat13 = reuse_things[0], reuse_things[2], reuse_things[4][0], reuse_things[4][
+    #         1], reuse_things[4][2]
+    #     flow10, metric1, feat21, feat22, feat23 = reuse_things[1], reuse_things[3], reuse_things[5][0], reuse_things[5][
+    #         1], reuse_things[5][2]
+    #
+    #     F1t = timestep * flow01
+    #     F2t = (1 - timestep) * flow10
+    #
+    #     Z1t = timestep * metric0
+    #     Z2t = (1 - timestep) * metric1
+    #
+    #     img0 = F.interpolate(img0, scale_factor=0.5, mode="bilinear", align_corners=False)
+    #     I1t = warp(img0, F1t, Z1t, strMode='soft')
+    #     img1 = F.interpolate(img1, scale_factor=0.5, mode="bilinear", align_corners=False)
+    #     I2t = warp(img1, F2t, Z2t, strMode='soft')
+    #
+    #     feat1t1 = warp(feat11, F1t, Z1t, strMode='soft')
+    #     feat2t1 = warp(feat21, F2t, Z2t, strMode='soft')
+    #
+    #     F1td = F.interpolate(F1t, scale_factor=0.5, mode="bilinear", align_corners=False) * 0.5
+    #     Z1d = F.interpolate(Z1t, scale_factor=0.5, mode="bilinear", align_corners=False)
+    #     feat1t2 = warp(feat12, F1td, Z1d, strMode='soft')
+    #     F2td = F.interpolate(F2t, scale_factor=0.5, mode="bilinear", align_corners=False) * 0.5
+    #     Z2d = F.interpolate(Z2t, scale_factor=0.5, mode="bilinear", align_corners=False)
+    #     feat2t2 = warp(feat22, F2td, Z2d, strMode='soft')
+    #
+    #     F1tdd = F.interpolate(F1t, scale_factor=0.25, mode="bilinear", align_corners=False) * 0.25
+    #     Z1dd = F.interpolate(Z1t, scale_factor=0.25, mode="bilinear", align_corners=False)
+    #     feat1t3 = warp(feat13, F1tdd, Z1dd, strMode='soft')
+    #     F2tdd = F.interpolate(F2t, scale_factor=0.25, mode="bilinear", align_corners=False) * 0.25
+    #     Z2dd = F.interpolate(Z2t, scale_factor=0.25, mode="bilinear", align_corners=False)
+    #     feat2t3 = warp(feat23, F2tdd, Z2dd, strMode='soft')
+    #
+    #     out = self.fusionnet(torch.cat([I1t, rife, I2t], dim=1), torch.cat([feat1t1, feat2t1], dim=1),
+    #                          torch.cat([feat1t2, feat2t2], dim=1), torch.cat([feat1t3, feat2t3], dim=1))
+    #
+    #     return torch.clamp(out, 0, 1)

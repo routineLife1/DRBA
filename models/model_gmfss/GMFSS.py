@@ -86,9 +86,6 @@ class Model:
         flow10, metric1, feat21, feat22, feat23 = reuse_things[1], reuse_things[3], reuse_things[5][0], reuse_things[5][
             1], reuse_things[5][2]
 
-        timestep0 = torch.clamp(timestep0, 0, 1)
-        timestep1 = torch.clamp(timestep1, 0, 1)
-
         F1t = timestep0 * flow01
         F2t = timestep1 * flow10
 

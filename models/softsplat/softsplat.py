@@ -245,7 +245,7 @@ def cuda_launch(strKey: str):
 ##########################################################
 
 
-def softsplat(tenIn: torch.Tensor, tenFlow: torch.Tensor, tenMetric: torch.Tensor, strMode: str):
+def softsplat(tenIn, tenFlow, tenMetric, strMode: str):
     output_dtype = tenIn.dtype
 
     tenIn, tenFlow, tenMetric = [x.float() if x is not None else None for x in [tenIn, tenFlow, tenMetric]]
