@@ -1,5 +1,7 @@
 from models.pytorch_msssim import ssim_matlab
 from torch.nn import functional as F
+from PIL import ImageDraw, ImageFont
+from torchvision import transforms
 import cv2
 import numpy as np
 import torch
@@ -84,6 +86,35 @@ def convert(param):
         for k, v in param.items()
         if "module." in k
     }
+
+
+def mark_tensor(tensor, text):
+    """
+        Mark something to tensor for debugging
+    """
+    n, c, h, w = tensor.shape
+    to_pil = transforms.ToPILImage()
+    image_pil = to_pil(tensor.clone().squeeze(0))
+
+    draw = ImageDraw.Draw(image_pil)
+
+    try:
+        font = ImageFont.truetype("arial.ttf", 24)
+    except IOError:
+        font = ImageFont.load_default()
+
+    text_width, text_height = draw.textsize(text, font=font)
+
+    x_pos = w - text_width - 10
+    y_pos = 10
+
+    # 在图片上绘制文字
+    draw.text((x_pos, y_pos), text, font=font, fill=(255, 255, 255))
+
+    to_tensor = transforms.ToTensor()
+    image_tensor_with_text = to_tensor(image_pil).unsqueeze(0)
+
+    return image_tensor_with_text
 
 
 class TMapper:

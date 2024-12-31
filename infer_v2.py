@@ -118,6 +118,11 @@ def inference():
         for x in output:
             video_io.write_frame(to_out(x, src_size))
 
+        # debug
+        # for i in range(len(output)):
+        #     output[i] = mark_tensor(output[i], f"{ts[i] + idx}")
+        #     video_io.write_frame(to_out(output[i], src_size))
+
         I0 = I2
         idx += 2
         pbar.update(2)

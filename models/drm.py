@@ -100,7 +100,7 @@ def get_drm_t(drm, _t, precision=1e-3):
     return x_drm.to(dtype)
 
 
-def calc_drm_rife(_t, flow01, flow10, flow12, flow21):
+def calc_drm_rife(_t, flow10, flow12, linear=False):
     # Compute the distance using the optical flow and distance calculator
     d10 = distance_calculator(flow10) + 1e-4
     d12 = distance_calculator(flow12) + 1e-4
@@ -113,62 +113,67 @@ def calc_drm_rife(_t, flow01, flow10, flow12, flow21):
     drm01_unaligned = 1 - drm10
     drm21_unaligned = 1 - drm12
 
-    ones_mask = torch.ones_like(drm10, device=drm10.device)
     warp_method = 'avg'
 
-    drm0t1_unaligned = get_drm_t(drm01_unaligned, _t)
-    drm1t0_unaligned = get_drm_t(drm10, _t)
-    drm1t2_unaligned = get_drm_t(drm12, _t)
-    drm2t1_unaligned = get_drm_t(drm21_unaligned, _t)
+    if linear:
+        drm0t1_unaligned = drm01_unaligned * _t * 2
+        drm2t1_unaligned = drm21_unaligned * _t * 2
+    else:
+        drm0t1_unaligned = get_drm_t(drm01_unaligned, _t)
+        drm2t1_unaligned = get_drm_t(drm21_unaligned, _t)
 
-    drm0t1 = warp(drm0t1_unaligned, flow01 * drm0t1_unaligned, None, warp_method)
-    drm1t0 = warp(drm1t0_unaligned, flow10 * drm1t0_unaligned, None, warp_method)
-    drm1t2 = warp(drm1t2_unaligned, flow12 * drm1t2_unaligned, None, warp_method)
-    drm2t1 = warp(drm2t1_unaligned, flow21 * drm2t1_unaligned, None, warp_method)
+    drm0t1 = warp(drm0t1_unaligned, flow10 * drm0t1_unaligned, None, warp_method)
+    drm2t1 = warp(drm2t1_unaligned, flow12 * drm2t1_unaligned, None, warp_method)
 
-    mask0t1 = warp(ones_mask, flow01 * drm0t1_unaligned, None, warp_method)
-    mask1t0 = warp(ones_mask, flow10 * drm1t0_unaligned, None, warp_method)
-    mask1t2 = warp(ones_mask, flow12 * drm1t2_unaligned, None, warp_method)
-    mask2t1 = warp(ones_mask, flow21 * drm2t1_unaligned, None, warp_method)
+    ones_mask = torch.ones_like(drm0t1, device=drm0t1.device)
+
+    mask0t1 = warp(ones_mask, flow10 * drm0t1_unaligned, None, warp_method)
+    mask2t1 = warp(ones_mask, flow12 * drm2t1_unaligned, None, warp_method)
 
     holes0t1 = mask0t1 < 0.999
-    holes1t0 = mask1t0 < 0.999
-    holes1t2 = mask1t2 < 0.999
     holes2t1 = mask2t1 < 0.999
 
     drm0t1[holes0t1] = drm0t1_unaligned[holes0t1]
-    drm1t0[holes1t0] = drm1t0_unaligned[holes1t0]
-    drm1t2[holes1t2] = drm1t2_unaligned[holes1t2]
     drm2t1[holes2t1] = drm2t1_unaligned[holes2t1]
 
-    return drm0t1, drm1t0, drm1t2, drm2t1
+    # why use drm0t1 not drm1t0, because rife use backward warp not forward warp.
+    return drm0t1, drm2t1
 
 
-def calc_drm_rife_auxiliary(_t, drm10, drm12, flow10, flow12, metric10, metric12):
+def calc_drm_rife_auxiliary(_t, drm10, drm12, flow10, flow12, metric10, metric12, linear=False):
     # drm10 and drm12 can be directly calculated by nesting calc_drm_gmfss(flow10, flow12, metric10, metric12).
     # However, in order to reuse these two variables to improve efficiency,
     # drm10 and drm12 are directly passed as parameters here.
     warp_method = 'soft' if (metric10 is not None and metric12 is not None) else 'avg'
 
+    # Theoretically, the distance ratio can only be controlled by flow emitted from the center to sides.
+    drm01_unaligned = 1 - drm10
+    drm21_unaligned = 1 - drm12
+
     # For RIFE, drm should be aligned with the time corresponding to the intermediate frame.
-    drm1t0_unaligned = get_drm_t(drm10, _t)
-    drm1t2_unaligned = get_drm_t(drm12, _t)
+    if linear:
+        drm0t1_unaligned = drm01_unaligned * _t * 2
+        drm2t1_unaligned = drm21_unaligned * _t * 2
+    else:
+        drm0t1_unaligned = get_drm_t(drm01_unaligned, _t)
+        drm2t1_unaligned = get_drm_t(drm21_unaligned, _t)
 
-    drm1t0 = warp(drm1t0_unaligned, flow10 * drm1t0_unaligned, metric10, warp_method)
-    drm1t2 = warp(drm1t2_unaligned, flow12 * drm1t2_unaligned, metric12, warp_method)
+    drm0t1 = warp(drm0t1_unaligned, flow10 * drm0t1_unaligned, metric10, warp_method)
+    drm2t1 = warp(drm2t1_unaligned, flow12 * drm2t1_unaligned, metric12, warp_method)
 
-    ones_mask = torch.ones_like(drm1t0, device=drm1t0.device)
+    ones_mask = torch.ones_like(drm0t1, device=drm0t1.device)
 
-    warped_ones_mask1t0 = warp(ones_mask, flow10 * drm1t0_unaligned, metric10, warp_method)
-    warped_ones_mask1t2 = warp(ones_mask, flow12 * drm1t2_unaligned, metric12, warp_method)
+    mask0t1 = warp(ones_mask, flow10 * drm0t1_unaligned, metric10, warp_method)
+    mask2t1 = warp(ones_mask, flow12 * drm2t1_unaligned, metric12, warp_method)
 
-    holes1t0 = warped_ones_mask1t0 < 0.999
-    holes1t2 = warped_ones_mask1t2 < 0.999
+    holes0t1 = mask0t1 < 0.999
+    holes2t1 = mask2t1 < 0.999
 
-    drm1t0[holes1t0] = drm1t0_unaligned[holes1t0]
-    drm1t2[holes1t2] = drm1t2_unaligned[holes1t2]
+    drm0t1[holes0t1] = drm0t1_unaligned[holes0t1]
+    drm2t1[holes2t1] = drm2t1_unaligned[holes2t1]
 
-    return drm1t0, drm1t2
+    # why use drm0t1 not drm1t0, because rife use backward warp not forward warp.
+    return drm0t1, drm2t1
 
 # Deprecated: Code below is no longer in use and may be removed in the future.
 
