@@ -22,7 +22,7 @@ def parse_args():
     parser.add_argument('-o', '--output', dest='output', type=str, default='output.mp4',
                         help='absolute path of output video')
     parser.add_argument('-fps', '--dst_fps', dest='dst_fps', type=float, default=60, help='interpolate to ? fps')
-    parser.add_argument('-s', '--enable_scdet', dest='enable_scdet', action='store_true', default=True,
+    parser.add_argument('-s', '--enable_scdet', dest='enable_scdet', action='store_true', default=False,
                         help='enable scene change detection')
     parser.add_argument('-st', '--scdet_threshold', dest='scdet_threshold', type=float, default=0.3,
                         help='ssim scene detection threshold')
@@ -101,7 +101,7 @@ def inference():
             left_ts = ts[ts < 1]
             right_ts = ts[ts >= 1] - 1
 
-            output = [I1 for _ in left_ts]
+            output = [I0 for _ in left_ts]
             output.extend(model.inference_ts(I1, I2, right_ts))
 
         elif not left_scene and right_scene:  # scene transition occurs at I1~I2

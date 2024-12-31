@@ -48,7 +48,7 @@ Usage: python infer_v2.py -m model -i in_video -o out_video [options]...
   -i input             输入视频的绝对路径(例: E:/input.mp4)
   -o output            输出视频的绝对路径(例: E:/input.mp4)
   -fps dst_fps         导出视频的目标帧率 (默认为60)
-  -s enable_scdet      开启转场识别 (默认开启)
+  -s enable_scdet      开启转场识别 (默认关闭)
   -st scdet_threshold  ssim转场识别阈值 (默认为0.3)
   -hw hwaccel          开启硬件加速编码 (默认开启) (需要NVIDIA显卡)
   -s scale             光流缩放尺度 (默认为1.0), 通常在处理1080p分辨率视频使用1.0, 4K分辨率时使用0.5

@@ -22,7 +22,7 @@ def parse_args():
     parser.add_argument('-o', '--output', dest='output', type=str, default='output.mp4',
                         help='absolute path of output video')
     parser.add_argument('-fps', '--dst_fps', dest='dst_fps', type=float, default=60, help='interpolate to ? fps')
-    parser.add_argument('-s', '--enable_scdet', dest='enable_scdet', action='store_true', default=True,
+    parser.add_argument('-s', '--enable_scdet', dest='enable_scdet', action='store_true', default=False,
                         help='enable scene change detection')
     parser.add_argument('-st', '--scdet_threshold', dest='scdet_threshold', type=float, default=0.3,
                         help='ssim scene detection threshold')

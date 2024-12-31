@@ -57,7 +57,7 @@ Usage: python infer_v2.py -m model -i in_video -o out_video [options]...
   -i input             input video path (absolute path of output video)
   -o output            output video path (absolute path of output video)
   -fps dst_fps         target frame rate (default=60)
-  -s enable_scdet      enable scene change detection (default Enable)
+  -s enable_scdet      enable scene change detection (default False)
   -st scdet_threshold  ssim scene detection threshold (default=0.3)
   -hw hwaccel          enable hardware acceleration encode (default Enable) (require nvidia graph card)
   -scale scale         flow scale factor (default=1.0), generally use 1.0 with 1080P and 0.5 with 4K resolution
