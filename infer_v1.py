@@ -55,7 +55,7 @@ def load_model(model_type):
 def inference():
     video_io = VideoFI_IO(input_path, output_path, dst_fps=dst_fps, times=-1, hwaccel=hwaccel)
     src_fps = video_io.src_fps
-    if dst_fps > src_fps:
+    if dst_fps <= src_fps:
         raise ValueError(f'dst fps should be greater than src fps, but got dst_fps={dst_fps} and src_fps={src_fps}')
     pbar = tqdm(total=video_io.total_frames_count)
 
