@@ -34,14 +34,14 @@ requirement中包含cupy包依赖, 该包用于加速计算。如果安装遇到
 **视频补帧**
 ```bash
   # 速度优先(致力于实时播放)
-  python infer_v1.py -m rife -i input.mp4 -o output.mp4 -fps 60 -scale 1.0 -s -st 0.3 -hw
+  python infer_v2.py -m rife -i input.mp4 -o output.mp4 -fps 60 -scale 1.0 -s -st 0.3 -hw
   # 质量优先
-  python infer_v1.py -m gmfss_union -i input.mp4 -o output.mp4 -fps 60 -scale 1.0 -s -st 0.3 -hw
+  python infer_v2.py -m gmfss_union -i input.mp4 -o output.mp4 -fps 60 -scale 1.0 -s -st 0.3 -hw
 ```
 
 **完整用法**
 ```bash
-Usage: python infer_v1.py -m model -i in_video -o out_video [options]...
+Usage: python infer_v2.py -m model -i in_video -o out_video [options]...
        
   -h                   展示此帮助信息
   -m model             选择使用的模型 (目前支持: rife, gmfss, gmfss_union) (默认为rife)
