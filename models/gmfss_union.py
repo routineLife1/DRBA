@@ -3,7 +3,6 @@ from models.model_gmfss_union.GMFSS import Model
 from models.rife_426_heavy.IFNet_HDv3 import IFNet
 from models.drm import calc_drm_gmfss, calc_drm_rife_auxiliary, get_drm_t
 from models.utils.tools import *
-import numpy as np
 import torch
 import os
 
