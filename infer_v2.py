@@ -116,13 +116,12 @@ def inference():
             # v2 no longer need reuse
             output, _ = model.inference_ts_drba(I0, I1, I2, ts, _reuse=None)
 
-        for x in output:
-            video_io.write_frame(to_out(x, src_size))
-
         # debug
         # for i in range(len(output)):
         #     output[i] = mark_tensor(output[i], f"{ts[i] + idx}")
-        #     video_io.write_frame(to_out(output[i], src_size))
+
+        for x in output:
+            video_io.write_frame(to_out(x, src_size))
 
         I0 = I2
         idx += 2
