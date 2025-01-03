@@ -7,7 +7,7 @@ else:
     from models.softsplat.softsplat_torch import softsplat as warp
 
 
-def get_drm_t(drm, _t, precision=1e-3):
+def get_drm_t(drm, t, precision=1e-3):
     """
     DRM is a tensor with dimensions b, 1, h, w, where for any value x (0 < x < 1).
     We define the timestep of the entire DRM tensor as 0.5, want the entire DRM approach t,
@@ -40,8 +40,8 @@ def get_drm_t(drm, _t, precision=1e-3):
     x_drm, b_drm = drm.float().clone(), drm.float().clone()
     l_drm, r_drm = torch.zeros_like(x_drm, device=x_drm.device), torch.ones_like(x_drm, device=x_drm.device)
 
-    while abs(_x - _t) > precision:
-        if _x > _t:
+    while abs(_x - t) > precision:
+        if _x > t:
             r = _x
             # print(f"{_x} - ({_x} - {l}) * {b}")
             _x = _x - (_x - l) * b
@@ -50,7 +50,7 @@ def get_drm_t(drm, _t, precision=1e-3):
             x_drm = x_drm - (x_drm - l_drm) * b_drm
             # print(_x, x_drm)
 
-        if _x < _t:
+        if _x < t:
             l = _x
             # print(f"{_x} + ({r} - {_x}) * {b}")
             _x = _x + (r - _x) * b
@@ -62,7 +62,7 @@ def get_drm_t(drm, _t, precision=1e-3):
     return x_drm.to(dtype)
 
 
-def calc_drm_rife(_t, flow10, flow12, linear=False):
+def calc_drm_rife(t, flow10, flow12, linear=False):
     # Compute the distance using the optical flow and distance calculator
     d10 = distance_calculator(flow10) + 1e-4
     d12 = distance_calculator(flow12) + 1e-4
@@ -72,11 +72,11 @@ def calc_drm_rife(_t, flow10, flow12, linear=False):
     drm12 = d12 / (d10 + d12)
 
     if linear:
-        drm_t0_unaligned = drm10 * _t * 2
-        drm_t1_unaligned = drm12 * _t * 2
+        drm_t0_unaligned = drm10 * t * 2
+        drm_t1_unaligned = drm12 * t * 2
     else:
-        drm_t0_unaligned = get_drm_t(drm10, _t)
-        drm_t1_unaligned = get_drm_t(drm12, _t)
+        drm_t0_unaligned = get_drm_t(drm10, t)
+        drm_t1_unaligned = get_drm_t(drm12, t)
 
     warp_method = 'avg'
     # When using RIFE to generate intermediate frames between I0 and I1,
@@ -155,7 +155,7 @@ def calc_drm_gmfss(t, flow10, flow12, metric10, metric12, linear=False):
     }
 
 
-def calc_drm_rife_auxiliary(_t, flow10, flow12, metric10, metric12, linear=False):
+def calc_drm_rife_auxiliary(t, flow10, flow12, metric10, metric12, linear=False):
     # Compute the distance using the optical flow and distance calculator
     d10 = distance_calculator(flow10) + 1e-4
     d12 = distance_calculator(flow12) + 1e-4
@@ -165,11 +165,11 @@ def calc_drm_rife_auxiliary(_t, flow10, flow12, metric10, metric12, linear=False
     drm12 = d12 / (d10 + d12)
 
     if linear:
-        drm_t0_unaligned = drm10 * _t * 2
-        drm_t1_unaligned = drm12 * _t * 2
+        drm_t0_unaligned = drm10 * t * 2
+        drm_t1_unaligned = drm12 * t * 2
     else:
-        drm_t0_unaligned = get_drm_t(drm10, _t)
-        drm_t1_unaligned = get_drm_t(drm12, _t)
+        drm_t0_unaligned = get_drm_t(drm10, t)
+        drm_t1_unaligned = get_drm_t(drm12, t)
 
     warp_method = 'soft' if (metric10 is not None and metric12 is not None) else 'avg'
 

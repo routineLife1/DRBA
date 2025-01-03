@@ -23,17 +23,17 @@ class RIFE:
 
     @torch.inference_mode()
     @torch.autocast(device_type="cuda" if torch.cuda.is_available() else "cpu")
-    def inference_ts(self, _I0, _I1, ts):
+    def inference_ts(self, I0, I1, ts):
         _output = []
         scale_list = [16 / self.scale, 8 / self.scale, 4 / self.scale, 2 / self.scale, 1 / self.scale]
         for t in ts:
             if t == 0:
-                _output.append(_I0)
+                _output.append(I0)
             elif t == 1:
-                _output.append(_I1)
+                _output.append(I1)
             else:
                 _output.append(
-                    self.ifnet(torch.cat((_I0, _I1), 1), timestep=t, scale_list=scale_list)[0]
+                    self.ifnet(torch.cat((I0, I1), 1), timestep=t, scale_list=scale_list)[0]
                 )
 
         return _output
@@ -78,29 +78,29 @@ class RIFE:
 
     @torch.inference_mode()
     @torch.autocast(device_type="cuda" if torch.cuda.is_available() else "cpu")
-    def inference_ts_drba(self, _I0, _I1, _I2, ts, _reuse=None, linear=False):
+    def inference_ts_drba(self, I0, I1, I2, ts, _reuse=None, linear=False):
 
-        flow10, flow01 = self.calc_flow(_I1, _I0) if not _reuse else _reuse
-        flow12, flow21 = self.calc_flow(_I1, _I2)
+        flow10, flow01 = self.calc_flow(I1, I0) if not _reuse else _reuse
+        flow12, flow21 = self.calc_flow(I1, I2)
 
         output = list()
         scale_list = [16 / self.scale, 8 / self.scale, 4 / self.scale, 2 / self.scale, 1 / self.scale]
         for t in ts:
             if t == 0:
-                output.append(_I0)
+                output.append(I0)
             elif t == 1:
-                output.append(_I1)
+                output.append(I1)
             elif t == 2:
-                output.append(_I2)
+                output.append(I2)
             elif 0 < t < 1:
                 t = 1 - t
                 drm = calc_drm_rife(t, flow10, flow12, linear)
-                out = self.ifnet(torch.cat((_I1, _I0), 1), timestep=drm['drm_t1_t01'], scale_list=scale_list)[0]
+                out = self.ifnet(torch.cat((I1, I0), 1), timestep=drm['drm_t1_t01'], scale_list=scale_list)[0]
                 output.append(out)
             elif 1 < t < 2:
                 t = t - 1
                 drm = calc_drm_rife(t, flow10, flow12, linear)
-                out = self.ifnet(torch.cat((_I1, _I2), 1), timestep=drm['drm_t1_t12'], scale_list=scale_list)[0]
+                out = self.ifnet(torch.cat((I1, I2), 1), timestep=drm['drm_t1_t12'], scale_list=scale_list)[0]
                 output.append(out)
 
         # next flow10, flow01 = reverse(current flow12, flow21)

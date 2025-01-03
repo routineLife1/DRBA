@@ -1,4 +1,4 @@
-# v1: In this version, model can theoretically avoid most transition breakdowns.
+# v1: model can theoretically avoid most transition breakdowns (Highly recommended to use this version)
 from tqdm import tqdm
 import argparse
 import time

@@ -1,4 +1,4 @@
-# v2: In this version, the workflow is streamlined (but more reliant on transition recognition)
+# v2: the workflow is streamlined (but more reliant on transition recognition)
 from tqdm import tqdm
 import argparse
 import time
