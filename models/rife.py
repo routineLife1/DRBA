@@ -24,25 +24,31 @@ class RIFE:
     @torch.inference_mode()
     @torch.autocast(device_type="cuda" if torch.cuda.is_available() else "cpu")
     def inference_ts(self, I0, I1, ts):
-        _output = []
+        output = []
         scale_list = [16 / self.scale, 8 / self.scale, 4 / self.scale, 2 / self.scale, 1 / self.scale]
         for t in ts:
             if t == 0:
-                _output.append(I0)
+                output.append(I0)
             elif t == 1:
-                _output.append(I1)
+                output.append(I1)
             else:
-                _output.append(
+                output.append(
                     self.ifnet(torch.cat((I0, I1), 1), timestep=t, scale_list=scale_list)[0]
                 )
 
-        return _output
+        return output
 
-    def calc_flow(self, a, b):
-        imgs = torch.cat((a, b), 1)
+    def calc_flow(self, a, b, f0=None, f1=None):
         scale_list = [16 / self.scale, 8 / self.scale, 4 / self.scale, 2 / self.scale, 1 / self.scale]
-        # get top scale flow flow0.5 -> 0/1
-        flow = self.ifnet(imgs, timestep=0.5, scale_list=scale_list)[1][-1]
+
+        # calc flow at 1/16 resolution (significantly faster with almost no quality loss).
+        timestep = (a[:, :1].clone() * 0 + 1) * 0.5
+        f0 = self.ifnet.encode(a[:, :3]) if f0 is None else f0
+        f1 = self.ifnet.encode(b[:, :3]) if f1 is None else f1
+        flow, _, _ = self.ifnet.block0(torch.cat((a[:, :3], b[:, :3], f0, f1, timestep), 1), None,
+                                       scale=scale_list[0])
+
+        # get flow flow0.5 -> 0/1
         flow50, flow51 = flow[:, :2], flow[:, 2:]
 
         warp_method = 'avg'
@@ -60,7 +66,7 @@ class RIFE:
         flow05_secondary = -warp(flow50, flow50, None, warp_method)
         flow15_secondary = -warp(flow51, flow51, None, warp_method)
 
-        ones_mask = torch.ones_like(flow50, device=flow50.device)
+        ones_mask = flow50.clone() * 0 + 1
 
         warped_ones_mask_05 = warp(ones_mask, flow50, None, warp_method)
         warped_ones_mask_15 = warp(ones_mask, flow51, None, warp_method)
@@ -71,17 +77,20 @@ class RIFE:
         flow05_primary[holes_05] = flow05_secondary[holes_05]
         flow15_primary[holes_15] = flow15_secondary[holes_15]
 
-        _flow01 = flow05_primary * 2
-        _flow10 = flow15_primary * 2
+        flow01 = flow05_primary * 2
+        flow10 = flow15_primary * 2
 
-        return _flow01, _flow10
+        return flow01, flow10, f0, f1
 
     @torch.inference_mode()
     @torch.autocast(device_type="cuda" if torch.cuda.is_available() else "cpu")
-    def inference_ts_drba(self, I0, I1, I2, ts, _reuse=None, linear=False):
+    def inference_ts_drba(self, I0, I1, I2, ts, reuse=None, linear=False):
 
-        flow10, flow01 = self.calc_flow(I1, I0) if not _reuse else _reuse
-        flow12, flow21 = self.calc_flow(I1, I2)
+        flow10, flow01, f1, f0 = self.calc_flow(I1, I0) if not reuse else reuse
+        if reuse is None:
+            flow12, flow21, f1, f2 = self.calc_flow(I1, I2)
+        else:
+            flow12, flow21, f1, f2 = self.calc_flow(I1, I2, f0=reuse[2])
 
         output = list()
         scale_list = [16 / self.scale, 8 / self.scale, 4 / self.scale, 2 / self.scale, 1 / self.scale]
@@ -95,13 +104,15 @@ class RIFE:
             elif 0 < t < 1:
                 t = 1 - t
                 drm = calc_drm_rife(t, flow10, flow12, linear)
-                out = self.ifnet(torch.cat((I1, I0), 1), timestep=drm['drm_t1_t01'], scale_list=scale_list)[0]
+                inp = torch.cat((I1, I0), 1)
+                out = self.ifnet(inp, timestep=drm['drm_t1_t01'], scale_list=scale_list, f0=f1, f1=f0)[0]
                 output.append(out)
             elif 1 < t < 2:
                 t = t - 1
                 drm = calc_drm_rife(t, flow10, flow12, linear)
-                out = self.ifnet(torch.cat((I1, I2), 1), timestep=drm['drm_t1_t12'], scale_list=scale_list)[0]
+                inp = torch.cat((I1, I2), 1)
+                out = self.ifnet(inp, timestep=drm['drm_t1_t12'], scale_list=scale_list, f0=f1, f1=f2)[0]
                 output.append(out)
 
         # next flow10, flow01 = reverse(current flow12, flow21)
-        return output, (flow21, flow12)
+        return output, (flow21, flow12, f2, f1)

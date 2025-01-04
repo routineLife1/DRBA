@@ -38,7 +38,7 @@ def get_drm_t(drm, t, precision=1e-3):
 
     # float is suggested for drm calculation to avoid overflow
     x_drm, b_drm = drm.float().clone(), drm.float().clone()
-    l_drm, r_drm = torch.zeros_like(x_drm, device=x_drm.device), torch.ones_like(x_drm, device=x_drm.device)
+    l_drm, r_drm = x_drm.clone() * 0, x_drm.clone() * 0 + 1
 
     while abs(_x - t) > precision:
         if _x > t:
@@ -90,7 +90,7 @@ def calc_drm_rife(t, flow10, flow12, linear=False):
     drm_t1_t12 = warp(drm_t0_unaligned, flow12 * drm_t0_unaligned, None, warp_method)
     # drm_t2_t12 = warp(drm_t1_unaligned, flow12 * drm_t1_unaligned, None, warp_method)
 
-    ones_mask = torch.ones_like(drm10, device=drm10.device)
+    ones_mask = drm10.clone() * 0 + 1
 
     mask_t1_t01 = warp(ones_mask, flow10 * drm_t1_unaligned, None, warp_method)
     mask_t1_t12 = warp(ones_mask, flow12 * drm_t0_unaligned, None, warp_method)
@@ -133,7 +133,7 @@ def calc_drm_gmfss(t, flow10, flow12, metric10, metric12, linear=False):
     drm2t_t12 = warp(drm2t_t12_unaligned, flow12, metric12, warp_method)
 
     # Create a mask with all ones to identify the holes in the warped drm maps
-    ones_mask = torch.ones_like(drm0t_t01, device=drm0t_t01.device)
+    ones_mask = drm0t_t01.clone() * 0 + 1
 
     # Warp the ones mask
     warped_ones_mask0t_t01 = warp(ones_mask, flow10, metric10, warp_method)
@@ -177,7 +177,7 @@ def calc_drm_rife_auxiliary(t, flow10, flow12, metric10, metric12, linear=False)
     drm_t1_t01 = warp(drm_t1_unaligned, flow10 * drm_t1_unaligned, metric10, warp_method)
     drm_t1_t12 = warp(drm_t0_unaligned, flow12 * drm_t0_unaligned, metric12, warp_method)
 
-    ones_mask = torch.ones_like(drm10, device=drm10.device)
+    ones_mask = drm10.clone() * 0 + 1
 
     mask_t1_t01 = warp(ones_mask, flow10 * drm_t1_unaligned, metric10, warp_method)
     mask_t1_t12 = warp(ones_mask, flow12 * drm_t0_unaligned, metric12, warp_method)

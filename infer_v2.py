@@ -114,7 +114,7 @@ def inference():
 
         else:
             # v2 no longer need reuse
-            output, _ = model.inference_ts_drba(I0, I1, I2, ts, _reuse=None)
+            output, _ = model.inference_ts_drba(I0, I1, I2, ts, reuse=None)
 
         # debug
         # for i in range(len(output)):
