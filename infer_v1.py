@@ -128,7 +128,7 @@ def inference():
             output.extend([I1 for _ in right_ts])
 
         else:  # no scene transition
-            output, reuse = model.inference_ts_drba(I0, I1, I2, ts, reuse)
+            output, reuse = model.inference_ts_drba(I0, I1, I2, ts, reuse, linear=True)
 
         # debug
         # for i in range(len(output)):
