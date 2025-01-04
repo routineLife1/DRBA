@@ -16,58 +16,58 @@ class GMFSS:
 
     @torch.inference_mode()
     @torch.autocast(device_type="cuda" if torch.cuda.is_available() else "cpu")
-    def inference_ts(self, _I0, _I1, ts):
-        reuse = self.model.reuse(_I0, _I1, self.scale)
+    def inference_ts(self, I0, I1, ts):
+        reuse = self.model.reuse(I0, I1, self.scale)
 
-        _output = []
+        output = []
         for t in ts:
             if t == 0:
-                _output.append(_I0)
+                output.append(I0)
             elif t == 1:
-                _output.append(_I1)
+                output.append(I1)
             else:
-                _output.append(
-                    self.model.inference(_I0, _I1, reuse, timestep0=t, timestep1=1 - t)
+                output.append(
+                    self.model.inference(I0, I1, reuse, timestep0=t, timestep1=1 - t)
                 )
 
-        return _output
+        return output
 
     @torch.inference_mode()
     @torch.autocast(device_type="cuda" if torch.cuda.is_available() else "cpu")
-    def inference_ts_drba(self, _I0, _I1, _I2, ts, _reuse=None, linear=False):
+    def inference_ts_drba(self, I0, I1, I2, ts, reuse=None, linear=False):
 
-        reuse_i1i0 = self.model.reuse(_I1, _I0, self.scale) if _reuse is None else _reuse
-        reuse_i1i2 = self.model.reuse(_I1, _I2, self.scale)
+        reuseI1I0 = self.model.reuse(I1, I0, self.scale) if reuse is None else reuse
+        reuseI1I2 = self.model.reuse(I1, I2, self.scale)
 
-        flow10, metric10 = reuse_i1i0[0], reuse_i1i0[2]
-        flow12, metric12 = reuse_i1i2[0], reuse_i1i2[2]
+        flow10, metric10 = reuseI1I0[0], reuseI1I0[2]
+        flow12, metric12 = reuseI1I2[0], reuseI1I2[2]
 
         output = []
 
         for t in ts:
             if t == 0:
-                output.append(_I0)
+                output.append(I0)
             elif t == 1:
-                output.append(_I1)
+                output.append(I1)
             elif t == 2:
-                output.append(_I2)
+                output.append(I2)
             elif 0 < t < 1:
                 t = 1 - t
                 drm = calc_drm_gmfss(t, flow10, flow12, metric10, metric12, linear)
-                out = self.model.inference(_I1, _I0, reuse_i1i0, timestep0=drm['drm1t_t01'],
+                out = self.model.inference(I1, I0, reuseI1I0, timestep0=drm['drm1t_t01'],
                                            timestep1=drm['drm0t_t01'])
                 output.append(out)
 
             elif 1 < t < 2:
                 t = t - 1
                 drm = calc_drm_gmfss(t, flow10, flow12, metric10, metric12, linear)
-                out = self.model.inference(_I1, _I2, reuse_i1i2, timestep0=drm['drm1t_t12'],
+                out = self.model.inference(I1, I2, reuseI1I2, timestep0=drm['drm1t_t12'],
                                            timestep1=drm['drm2t_t12'])
                 output.append(out)
 
-        # next reuse_i1i0 = reverse(current reuse_i1i2)
-        # f0, f1, m0, m1, feat0, feat1 = reuse_i1i2
+        # next reuseI1i0 = reverse(current reuseI1i2)
+        # f0, f1, m0, m1, feat0, feat1 = reuseI1i2
         # _reuse = (f1, f0, m1, m0, feat1, feat0)
-        _reuse = [value for pair in zip(reuse_i1i2[1::2], reuse_i1i2[0::2]) for value in pair]
+        reuse = [value for pair in zip(reuseI1I2[1::2], reuseI1I2[0::2]) for value in pair]
 
-        return output, _reuse
+        return output, reuse
