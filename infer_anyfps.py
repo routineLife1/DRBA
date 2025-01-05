@@ -1,4 +1,3 @@
-# v1: model can theoretically avoid most transition breakdowns (Highly recommended to use this version)
 from tqdm import tqdm
 import argparse
 import time
@@ -23,6 +22,7 @@ def parse_args():
     parser.add_argument('-o', '--output', dest='output', type=str, default='output.mp4',
                         help='absolute path of output video')
     parser.add_argument('-fps', '--dst_fps', dest='dst_fps', type=float, default=60, help='interpolate to ? fps')
+    parser.add_argument('-t', '--times', dest='times', type=float, default=-1, help='interpolate to ?x fps')
     parser.add_argument('-s', '--enable_scdet', dest='enable_scdet', action='store_true', default=False,
                         help='enable scene change detection')
     parser.add_argument('-st', '--scdet_threshold', dest='scdet_threshold', type=float, default=0.3,
@@ -54,7 +54,7 @@ def load_model(model_type):
 
 
 def inference():
-    video_io = VideoFI_IO(input_path, output_path, dst_fps=dst_fps, times=-1, hwaccel=hwaccel)
+    video_io = VideoFI_IO(input_path, output_path, dst_fps=dst_fps, times=times, hwaccel=hwaccel)
     src_fps = video_io.src_fps
     if dst_fps <= src_fps:
         raise ValueError(f'dst fps should be greater than src fps, but got dst_fps={dst_fps} and src_fps={src_fps}')
@@ -68,7 +68,7 @@ def inference():
     I0 = to_inp(i0, dst_size)
     I1 = to_inp(i1, dst_size)
 
-    t_mapper = TMapper(src_fps, dst_fps)
+    t_mapper = TMapper(src_fps, dst_fps, times)
     idx = 0
 
     def calc_t(_idx: float):
@@ -168,7 +168,8 @@ if __name__ == '__main__':
     input_path = args.input  # input video path
     output_path = args.output  # output video path
     scale = args.scale  # flow scale
-    dst_fps = args.dst_fps  # Must be an integer multiple
+    dst_fps = args.dst_fps
+    times = args.times
     enable_scdet = args.enable_scdet  # enable scene change detection
     scdet_threshold = args.scdet_threshold  # scene change detection threshold
     hwaccel = args.hwaccel  # Use hardware acceleration video encoder

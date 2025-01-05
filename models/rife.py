@@ -53,32 +53,26 @@ class RIFE:
 
         warp_method = 'avg'
 
-        # only need forward direction flow
-        flow05_primary = warp(flow51, flow50, None, warp_method)
-        flow15_primary = warp(flow50, flow51, None, warp_method)
-
         # qvi
         # flow05, norm2 = fwarp(flow50, flow50)
         # flow05[norm2]...
         # flow05 = -flow05
 
-        # Another forward flow generation method may be used for filling gaps.
-        flow05_secondary = -warp(flow50, flow50, None, warp_method)
-        flow15_secondary = -warp(flow51, flow51, None, warp_method)
+        flow05 = -1 * warp(flow50, flow50, None, warp_method)
+        flow15 = -1 * warp(flow51, flow51, None, warp_method)
 
-        ones_mask = flow50.clone() * 0 + 1
+        ones_mask = flow05.clone() * 0 + 1
+        mask05 = warp(ones_mask, flow50, None, warp_method)
+        mask15 = warp(ones_mask, flow51, None, warp_method)
 
-        warped_ones_mask_05 = warp(ones_mask, flow50, None, warp_method)
-        warped_ones_mask_15 = warp(ones_mask, flow51, None, warp_method)
+        gap05 = mask05 < 0.999
+        gap15 = mask15 < 0.999
 
-        holes_05 = warped_ones_mask_05 < 0.999
-        holes_15 = warped_ones_mask_15 < 0.999
+        flow05[gap05] = (ones_mask * max(flow05.shape[2], flow05.shape[3]))[gap05]
+        flow15[gap15] = (ones_mask * max(flow15.shape[2], flow15.shape[3]))[gap15]
 
-        flow05_primary[holes_05] = flow05_secondary[holes_05]
-        flow15_primary[holes_15] = flow15_secondary[holes_15]
-
-        flow01 = flow05_primary * 2
-        flow10 = flow15_primary * 2
+        flow01 = flow05 * 2
+        flow10 = flow15 * 2
 
         return flow01, flow10, f0, f1
 

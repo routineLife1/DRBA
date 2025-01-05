@@ -43,20 +43,21 @@ The cupy package is included in the requirements, but its installation is option
 **Video Interpolation**
 ```bash
   # For speed preference
-  python infer_v1.py -m rife -i input.mp4 -o output.mp4 -fps 60 -scale 1.0 -s -st 0.3 -hw
+  python infer_anyfps.py -m rife -i input.mp4 -o output.mp4 -fps 60 -scale 1.0 -s -st 0.3 -hw
   # For quality preference
-  python infer_v1.py -m gmfss_union -i input.mp4 -o output.mp4 -fps 60 -scale 1.0 -s -st 0.3 -hw
+  python infer_anyfps.py -m gmfss_union -i input.mp4 -o output.mp4 -fps 60 -scale 1.0 -s -st 0.3 -hw
 ```
 
 **Full Usage**
 ```bash
-Usage: python infer_v1.py -m model -i in_video -o out_video [options]...
+Usage: python infer_anyfps.py -m model -i in_video -o out_video [options]...
        
   -h                   show this help
   -m model             model name (rife, gmfss, gmfss_union) (default=rife)
   -i input             input video path (absolute path of output video)
   -o output            output video path (absolute path of output video)
   -fps dst_fps         target frame rate (default=60)
+  -m times             interpolation times (default=-1, if specified, the times mode will be used as priority)
   -s enable_scdet      enable scene change detection (default False)
   -st scdet_threshold  ssim scene detection threshold (default=0.3)
   -hw hwaccel          enable hardware acceleration encode (default Enable) (require nvidia graph card)
@@ -67,6 +68,7 @@ Usage: python infer_v1.py -m model -i in_video -o out_video [options]...
 - input accept absolute video file path. Example: E:/input.mp4
 - output accept absolute video file path. Example: E:/output.mp4
 - dst_fps = target interpolated video frame rate. Example: 60
+- times = interpolation times. Example: 2 (if specified, the times mode will be used as priority)
 - enable_scdet = enable scene change detection.
 - scdet_threshold = scene change detection threshold. The larger the value, the more sensitive the detection.
 - hwaccel = enable hardware acceleration during encoding output video.
