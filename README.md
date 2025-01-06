@@ -43,14 +43,14 @@ The cupy package is included in the requirements, but its installation is option
 **Video Interpolation**
 ```bash
   # For speed preference
-  python infer_anyfps.py -m rife -i input.mp4 -o output.mp4 -fps 60 -scale 1.0 -s -st 0.3 -hw
+  python infer.py -m rife -i input.mp4 -o output.mp4 -fps 60 -scale 1.0 -s -st 0.3 -hw
   # For quality preference
-  python infer_anyfps.py -m gmfss_union -i input.mp4 -o output.mp4 -fps 60 -scale 1.0 -s -st 0.3 -hw
+  python infer.py -m gmfss_union -i input.mp4 -o output.mp4 -fps 60 -scale 1.0 -s -st 0.3 -hw
 ```
 
 **Full Usage**
 ```bash
-Usage: python infer_anyfps.py -m model -i in_video -o out_video [options]...
+Usage: python infer.py -m model -i in_video -o out_video [options]...
        
   -h                   show this help
   -m model             model name (rife, gmfss, gmfss_union) (default=rife)
