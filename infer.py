@@ -75,11 +75,11 @@ def inference():
         if times != -1:
             if times % 2:
                 vfi_timestamp = [(_i + 1) / times for _i in range((times - 1) // 2)]  # 0 ~ 0.5
-                vfi_timestamp = [0.5 + t for t in vfi_timestamp] + [1] + [t + 1 for t in vfi_timestamp]
+                vfi_timestamp = list(reversed([1 - t for t in vfi_timestamp])) + [1] + [t + 1 for t in vfi_timestamp]
                 return np.array(vfi_timestamp)
             else:
                 vfi_timestamp = [(_i + 0.5) / times for _i in range(times // 2)]  # 0 ~ 0.5
-                vfi_timestamp = [0.5 + t for t in vfi_timestamp] + [t + 1 for t in vfi_timestamp]
+                vfi_timestamp = list(reversed([1 - t for t in vfi_timestamp])) + [t + 1 for t in vfi_timestamp]
                 return np.array(vfi_timestamp)
 
         timestamp = np.array(
