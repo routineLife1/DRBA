@@ -57,7 +57,7 @@ Usage: python infer_anyfps.py -m model -i in_video -o out_video [options]...
   -i input             input video path (absolute path of output video)
   -o output            output video path (absolute path of output video)
   -fps dst_fps         target frame rate (default=60)
-  -m times             interpolation times (default=-1, if specified, the times mode will be used as priority)
+  -t times             interpolation times (default=-1, if specified, the times mode will be used as priority)
   -s enable_scdet      enable scene change detection (default False)
   -st scdet_threshold  ssim scene detection threshold (default=0.3)
   -hw hwaccel          enable hardware acceleration encode (default Enable) (require nvidia graph card)

@@ -1,3 +1,4 @@
+# sequential: may help resolve the frame backward issue
 from tqdm import tqdm
 import argparse
 import time
@@ -22,7 +23,7 @@ def parse_args():
     parser.add_argument('-o', '--output', dest='output', type=str, default='output.mp4',
                         help='absolute path of output video')
     parser.add_argument('-fps', '--dst_fps', dest='dst_fps', type=float, default=60, help='interpolate to ? fps')
-    parser.add_argument('-t', '--times', dest='times', type=float, default=-1, help='interpolate to ?x fps')
+    parser.add_argument('-t', '--times', dest='times', type=int, default=-1, help='interpolate to ?x fps')
     parser.add_argument('-s', '--enable_scdet', dest='enable_scdet', action='store_true', default=False,
                         help='enable scene change detection')
     parser.add_argument('-st', '--scdet_threshold', dest='scdet_threshold', type=float, default=0.3,
@@ -61,74 +62,60 @@ def inference():
     pbar = tqdm(total=video_io.total_frames_count)
 
     # start inference
-    i0, i1 = video_io.read_frame(), video_io.read_frame()
+    i0 = video_io.read_frame()
     size = get_valid_net_inp_size(i0, model.scale, div=model.pad_size)
     src_size, dst_size = size['src_size'], size['dst_size']
 
     I0 = to_inp(i0, dst_size)
-    I1 = to_inp(i1, dst_size)
 
     t_mapper = TMapper(src_fps, dst_fps, times)
     idx = 0
 
     def calc_t(_idx: float):
         timestamp = np.array(
-            t_mapper.get_range_timestamps(_idx - 0.5, _idx + 0.5, lclose=True, rclose=False, normalize=False))
-        vfi_timestamp = np.round(timestamp - _idx, 4) + 1  # [0.5, 1.5)
+            t_mapper.get_range_timestamps(_idx, _idx + 2, lclose=True, rclose=False, normalize=False))
+        vfi_timestamp = np.round(timestamp - _idx, 4)  # [0, 2)
 
         return vfi_timestamp
 
-    # head
-    ts = calc_t(idx)
-    left_scene = check_scene(I0, I1, scdet_threshold) if enable_scdet else False
-    right_scene = left_scene
-    reuse = None
-
-    if right_scene:
-        output = [I0 for _ in ts]
-    else:
-        left_ts = ts[ts < 1]
-        right_ts = ts[ts >= 1] - 1
-
-        output = [I0 for _ in left_ts]
-        output.extend(model.inference_ts(I0, I1, right_ts))
-
-    for x in output:
-        video_io.write_frame(to_out(x, src_size))
-    pbar.update(1)
-
     while True:
+        i1 = video_io.read_frame()
+        if i1 is None:
+            break
         i2 = video_io.read_frame()
         if i2 is None:
             break
+        I1 = to_inp(i1, dst_size)
         I2 = to_inp(i2, dst_size)
 
-        ts = calc_t(idx)
+        left_scene = check_scene(I0, I1, scdet_threshold) if enable_scdet else False
         right_scene = check_scene(I1, I2, scdet_threshold) if enable_scdet else False
 
+        ts = calc_t(idx)
         # If a scene transition occurs between the three frames, then the calculation of this DRM is meaningless.
         if left_scene and right_scene:  # scene transition occurs at I0~I1, also occurs at I1~I2
-            output = [I1 for _ in ts]
-            reuse = None
+            left_ts = ts[ts < 1]
+            right_ts = ts[ts >= 1]
+            output = [I0 for _ in left_ts]
+            output.extend([I1 for _ in right_ts])
 
         elif left_scene and not right_scene:  # scene transition occurs at I0~I1
             left_ts = ts[ts < 1]
             right_ts = ts[ts >= 1] - 1
-            reuse = None
 
-            output = [I1 for _ in left_ts]
+            output = [I0 for _ in left_ts]
             output.extend(model.inference_ts(I1, I2, right_ts))
 
         elif not left_scene and right_scene:  # scene transition occurs at I1~I2
             left_ts = ts[ts <= 1]
             right_ts = ts[ts > 1] - 1
-            reuse = None
 
             output = model.inference_ts(I0, I1, left_ts)
             output.extend([I1 for _ in right_ts])
 
-        else:  # no scene transition
-            output, reuse = model.inference_ts_drba(I0, I1, I2, ts, reuse, linear=True)
+        else:
+            # v2 no longer need reuse
+            output, _ = model.inference_ts_drba(I0, I1, I2, ts, reuse=None, linear=False)
 
         # debug
         # for i in range(len(output)):
@@ -137,22 +124,24 @@ def inference():
         for x in output:
             video_io.write_frame(to_out(x, src_size))
 
-        i0, i1 = i1, i2
-        I0, I1 = I1, I2
-        left_scene = right_scene
-        idx += 1
-        pbar.update(1)
+        I0 = I2
+        idx += 2
+        pbar.update(2)
 
-    # tail
-    ts = calc_t(idx)
-    left_ts = ts[ts <= 1]
-    right_ts = ts[ts > 1] - 1
+    # tail (if exist)
+    if i1 is not None:
+        I1 = to_inp(i1, dst_size)
+        ts = t_mapper.get_range_timestamps(idx, idx + 1, lclose=True, rclose=True, normalize=False)
+        scene = check_scene(I0, I1, scdet_threshold) if enable_scdet else False
 
-    output = model.inference_ts(I0, I1, left_ts)
-    output.extend([I1 for _ in right_ts])
+        if scene:
+            output = [I0 for _ in ts]
+        else:
+            output = model.inference_ts(I0, I1, ts)
 
-    for x in output:
-        video_io.write_frame(to_out(x, src_size))
+        for x in output:
+            video_io.write_frame(to_out(x, src_size))
+
     idx += 1
     pbar.update(1)
 
@@ -168,7 +157,7 @@ if __name__ == '__main__':
     input_path = args.input  # input video path
     output_path = args.output  # output video path
     scale = args.scale  # flow scale
-    dst_fps = args.dst_fps
+    dst_fps = args.dst_fps  # Must be an integer multiple
     times = args.times
     enable_scdet = args.enable_scdet  # enable scene change detection
     scdet_threshold = args.scdet_threshold  # scene change detection threshold
