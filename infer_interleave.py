@@ -72,7 +72,6 @@ def inference():
     idx = 0
 
     def calc_t(_idx: float):
-        global times
         if times != -1:
             if times % 2:
                 vfi_timestamp = [(_i + 1) / times for _i in range((times - 1) // 2)]  # 0 ~ 0.5

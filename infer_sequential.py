@@ -1,4 +1,3 @@
-# sequential: may help resolve the frame backward issue
 from tqdm import tqdm
 import argparse
 import time
