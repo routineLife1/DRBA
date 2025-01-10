@@ -1,3 +1,5 @@
+import os
+
 from tqdm import tqdm
 import argparse
 import time
@@ -183,5 +185,9 @@ if __name__ == '__main__':
     enable_scdet = args.enable_scdet  # enable scene change detection
     scdet_threshold = args.scdet_threshold  # scene change detection threshold
     hwaccel = args.hwaccel  # Use hardware acceleration video encoder
+
+    if not os.path.exists(input_path):
+        raise FileNotFoundError(f"can't find the video file {input_path}")
+
     model = load_model(model_type)
     inference()

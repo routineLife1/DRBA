@@ -210,4 +210,4 @@ class VideoFI_IO:
         return self.read_buffer.get()
 
     def finish_writing(self):
-        return self.write_buffer.empty()
+        return self.write_buffer.empty() or self.ffmpeg_writer.stdin.closed
