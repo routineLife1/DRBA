@@ -46,7 +46,7 @@ Usage: python infer.py -m model -i in_video -o out_video [options]...
   -h                   展示此帮助信息
   -m model             选择使用的模型 (目前支持: rife, gmfss, gmfss_union) (默认为rife)
   -i input             输入视频的绝对路径(例: E:/input.mp4)
-  -o output            输出视频的绝对路径(例: E:/input.mp4)
+  -o output            输出视频的绝对路径(例: E:/output.mp4)
   -fps dst_fps         导出视频的目标帧率 (默认为60)
   -t times             导出视频的帧率倍率 (默认为-1, 若指定则优先使用倍率模式)
   -s enable_scdet      开启转场识别 (默认关闭)
