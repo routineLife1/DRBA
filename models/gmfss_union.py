@@ -19,13 +19,13 @@ class GMFSS_UNION:
             convert(torch.load(os.path.join(weights, "rife.pkl"), map_location='cpu')),
             strict=False)
         self.scale = scale
+        self.scale_list = [16 / self.scale, 8 / self.scale, 4 / self.scale, 2 / self.scale, 1 / self.scale]
         self.pad_size = 128
 
     @torch.inference_mode()
     @torch.autocast(device_type="cuda" if torch.cuda.is_available() else "cpu")
     def inference_ts(self, I0, I1, ts):
         reuse = self.model.reuse(I0, I1, self.scale)
-        scale_list = [16 / self.scale, 8 / self.scale, 4 / self.scale, 2 / self.scale, 1 / self.scale]
         output = []
         for t in ts:
             if t == 0:
@@ -35,7 +35,7 @@ class GMFSS_UNION:
             else:
                 I0s = F.interpolate(I0, scale_factor=0.5, mode='bilinear', align_corners=False)
                 I1s = F.interpolate(I1, scale_factor=0.5, mode='bilinear', align_corners=False)
-                rife = self.ifnet(torch.cat((I0s, I1s), 1), timestep=t, scale_list=scale_list)[0]
+                rife = self.ifnet(torch.cat((I0s, I1s), 1), timestep=t, scale_list=self.scale_list)[0]
                 output.append(
                     self.model.inference(I0, I1, reuse, timestep0=t, timestep1=1 - t, rife=rife)
                 )
@@ -56,7 +56,6 @@ class GMFSS_UNION:
                          for x in [I0, I1, I2]]
 
         output = []
-        scale_list = [16 / self.scale, 8 / self.scale, 4 / self.scale, 2 / self.scale, 1 / self.scale]
 
         for t in ts:
             if t == 0:
@@ -72,7 +71,7 @@ class GMFSS_UNION:
                 drm_rife = calc_drm_rife_auxiliary(t, flow10, flow12, metric10, metric12, linear)
                 drm_rife = {k: resize(v, I0s.shape[2:]) for k, v in drm_rife.items()}
 
-                rife = self.ifnet(torch.cat((I1s, I0s), 1), timestep=drm_rife['drm_t1_t01'], scale_list=scale_list)[0]
+                rife = self.ifnet(torch.cat((I1s, I0s), 1), timestep=drm_rife['drm_t1_t01'], scale_list=self.scale_list)[0]
 
                 out = self.model.inference(I1, I0, reuseI1I0, timestep0=drm_gmfss['drm1t_t01'],
                                            timestep1=drm_gmfss['drm0t_t01'], rife=rife)
@@ -86,7 +85,7 @@ class GMFSS_UNION:
                 drm_rife = calc_drm_rife_auxiliary(t, flow10, flow12, metric10, metric12, linear)
                 drm_rife = {k: resize(v, I0s.shape[2:]) for k, v in drm_rife.items()}
 
-                rife = self.ifnet(torch.cat((I1s, I2s), 1), timestep=drm_rife['drm_t1_t12'], scale_list=scale_list)[0]
+                rife = self.ifnet(torch.cat((I1s, I2s), 1), timestep=drm_rife['drm_t1_t12'], scale_list=self.scale_list)[0]
 
                 out = self.model.inference(I1, I2, reuseI1I2, timestep0=drm_gmfss['drm1t_t12'],
                                            timestep1=drm_gmfss['drm2t_t12'], rife=rife)
