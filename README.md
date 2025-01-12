@@ -7,27 +7,11 @@
 > thereby preserving the original pace and integrity of the characters while avoiding distortions common in frame
 > interpolation.
 
-## 📖Overview
-DRBA consists two parts('DRM Calculation' and 'Applying DRM to Frame Interpolation') to generate the adjusted in-between anime frame given three inputs.
-![Overview](assert/Overview.png)
-
-
 ### 📘[中文文档](README_CN.md)
 
 # 👀Demo
 
-## input
-![input](assert/input.gif)
-## output
-![output](assert/output.gif)
-
-# 👀Demos Videos(BiliBili)
-
-**[Sousou no Frieren NCOP1](https://www.bilibili.com/video/BV12QsaeREmr/?share_source=copy_web&vd_source=8a8926eb0f1d5f0f1cab7529c8f51282)**
-
-**[Sousou no Frieren NCOP2](https://www.bilibili.com/video/BV1RYs8eFE77/?share_source=copy_web&vd_source=8a8926eb0f1d5f0f1cab7529c8f51282)**
-
-**[OP「つよがるガール」](https://www.bilibili.com/video/BV1uJtPe9EdY/?share_source=copy_web&vd_source=8a8926eb0f1d5f0f1cab7529c8f51282)**
+![compare](assert/demo.mp4)
 
 ## 🔧Installation
 
@@ -74,27 +58,19 @@ Usage: python infer.py -m model -i in_video -o out_video [options]...
 - hwaccel = enable hardware acceleration during encoding output video.
 - scale = flow scale factor. Decrease this value to reduce the computational difficulty of the model at higher resolutions. Generally, use 1.0 for 1080P and 0.5 for 4K resolution.
 
-# 📖Model Comparison
+# 👀Other Demos(BiliBili)
 
-## gmfss(For learning and reference only.)
-The explanation of the algorithm's principles has not been organized yet. You may reach out in issue if you have any questions regarding the details for now.
+**[Sousou no Frieren NCOP1](https://www.bilibili.com/video/BV12QsaeREmr/?share_source=copy_web&vd_source=8a8926eb0f1d5f0f1cab7529c8f51282)**
 
-## rife(Aimed at real-time playback.)
+**[Sousou no Frieren NCOP2](https://www.bilibili.com/video/BV1RYs8eFE77/?share_source=copy_web&vd_source=8a8926eb0f1d5f0f1cab7529c8f51282)**
 
-**Due to the limitations of the RIFE algorithm's performance, some distortion may occur in the background during
-compensation.**
+**[OP「つよがるガール」](https://www.bilibili.com/video/BV1uJtPe9EdY/?share_source=copy_web&vd_source=8a8926eb0f1d5f0f1cab7529c8f51282)**
 
-![rife](assert/rife.png)
-
-**If you use RIFE v4.26 TRT, and implement the project with VapourSynth, real-time playback can be achieved on a reasonably powerful NVIDIA GPU.**
-
-## gmfss_union(For high-quality output.)
-
-**Combining the strengths of both RIFE and GMFSS, it delivers outstanding results.**
-
-![gmfss](assert/gmfss.png)
+## 📖Overview
+DRBA consists two parts('DRM Calculation' and 'Applying DRM to Frame Interpolation') to generate the adjusted in-between anime frame given three inputs.
+![Overview](assert/Overview.png)
 
 # 🔗Reference
 Optical Flow: [GMFlow](https://github.com/haofeixu/gmflow)
 
-Video Interpolation: [Practical-RIFE](https://github.com/hzwer/Practical-RIFE) [GMFSS](https://github.com/98mxr/GMFSS_Fortuna)
+Video Interpolation: [Practical-RIFE](https://github.com/hzwer/Practical-RIFE) [GMFSS](https://github.com/98mxr/GMFSS_Fortuna) [MultiPassDedup](https://github.com/routineLife1/MultiPassDedup)
