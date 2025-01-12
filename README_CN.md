@@ -3,8 +3,7 @@
 > **介绍：** 本项目可被视作一种专为动漫视频帧插值网络（Anime VFI）定制的控制机制。通过计算距离比率图（DistanceRatioMap）来调整视频中非线性与线性运动区域的帧插值策略，以达到流畅补帧的同时，保持动漫视频的原始节奏和人物绘图的完整性。
 
 # 👀效果演示
-
-![compare](assert/demo.mp4)
+https://github.com/user-attachments/assets/ec1dc508-8580-4259-9e9b-c25399d69579
 
 ## 🔧部署项目
 
