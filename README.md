@@ -54,7 +54,7 @@ Usage: python infer.py -m model -i in_video -o out_video [options]...
        
   -h                   show this help
   -m model             model name (rife, gmfss, gmfss_union) (default=rife)
-  -i input             input video path (absolute path of output video)
+  -i input             input video path (absolute path of input video)
   -o output            output video path (absolute path of output video)
   -fps dst_fps         target frame rate (default=60)
   -t times             interpolation times (default=-1, if specified, the times mode will be used as priority)
