@@ -10,8 +10,9 @@
 ### 📘[中文文档](README_CN.md)
 
 # 👀Demo
+https://github.com/user-attachments/assets/1f1dd01a-2edb-4198-a4a8-edf0979bb8ba
 
-![compare](assert/demo.mp4)
+
 
 ## 🔧Installation
 
