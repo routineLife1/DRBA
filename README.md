@@ -7,11 +7,12 @@
 > thereby preserving the original pace and integrity of the characters while avoiding distortions common in frame
 > interpolation.
 
-### 📘[中文文档](README_CN.md)
+
+<a href="https://colab.research.google.com/drive/1BGlSg7ghPoXC_s5UuF8Z__0YV4fGrQoA?usp=sharing"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="google colab logo"></a>
+### 📘[中文文档](README_CN.md)  
 
 # 👀Demo
 https://github.com/user-attachments/assets/1f1dd01a-2edb-4198-a4a8-edf0979bb8ba
-
 
 
 ## 🔧Installation
