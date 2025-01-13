@@ -28,9 +28,9 @@ The cupy package is included in the requirements, but its installation is option
 **Video Interpolation**
 ```bash
   # For speed preference
-  python infer.py -m rife -i input.mp4 -o output.mp4 -fps 60 -scale 1.0 -s -st 0.3 -hw
+  python infer.py -m rife -i input.mp4 -o output.mp4 -fps 60 -scale 1.0 -s -st 0.3
   # For quality preference
-  python infer.py -m gmfss_union -i input.mp4 -o output.mp4 -fps 60 -scale 1.0 -s -st 0.3 -hw
+  python infer.py -m gmfss_union -i input.mp4 -o output.mp4 -fps 60 -scale 1.0 -s -st 0.3
 ```
 
 **Full Usage**
@@ -45,7 +45,7 @@ Usage: python infer.py -m model -i in_video -o out_video [options]...
   -t times             interpolation times (default=-1, if specified, the times mode will be used as priority)
   -s enable_scdet      enable scene change detection (default False)
   -st scdet_threshold  ssim scene detection threshold (default=0.3)
-  -hw hwaccel          enable hardware acceleration encode (default Enable) (require nvidia graph card)
+  -hw hwaccel          enable hardware acceleration encode (default Disable) (require nvidia graph card)
   -scale scale         flow scale factor (default=1.0), generally use 1.0 with 1080P and 0.5 with 4K resolution
 ```
 

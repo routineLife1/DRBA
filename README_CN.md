@@ -35,7 +35,7 @@ Usage: python infer.py -m model -i in_video -o out_video [options]...
   -t times             导出视频的帧率倍率 (默认为-1, 若指定则优先使用倍率模式)
   -s enable_scdet      开启转场识别 (默认关闭)
   -st scdet_threshold  ssim转场识别阈值 (默认为0.3)
-  -hw hwaccel          开启硬件加速编码 (默认开启) (需要NVIDIA显卡)
+  -hw hwaccel          开启硬件加速编码 (默认关闭) (需要NVIDIA显卡)
   -s scale             光流缩放尺度 (默认为1.0), 通常在处理1080p分辨率视频使用1.0, 4K分辨率时使用0.5
 ```
 

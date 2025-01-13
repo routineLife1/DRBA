@@ -154,7 +154,7 @@ def get_ones_tensor_size(size: tuple, device, dtype: torch.dtype):
 
 
 class VideoFI_IO:
-    def __init__(self, input_path, output_path, dst_fps=60, times=-1, hwaccel=True):
+    def __init__(self, input_path, output_path, dst_fps=60, times=-1, hwaccel=False):
         self.video_capture = cv2.VideoCapture(input_path)
         self.src_fps = self.video_capture.get(cv2.CAP_PROP_FPS)
         self.dst_fps = dst_fps
@@ -170,7 +170,7 @@ class VideoFI_IO:
         _thread.start_new_thread(self.build_read_buffer, (self.read_buffer, self.video_capture))
         _thread.start_new_thread(self.clear_write_buffer, (self.write_buffer,))
 
-    def generate_frame_renderer(self, input_path, output_path, width, height, dst_fps, hwaccel=True):
+    def generate_frame_renderer(self, input_path, output_path, width, height, dst_fps, hwaccel=False):
         encoder = 'libx264'
         preset = 'medium'
         if hwaccel:

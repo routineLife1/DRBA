@@ -29,7 +29,7 @@ def parse_args():
                         help='enable scene change detection')
     parser.add_argument('-st', '--scdet_threshold', dest='scdet_threshold', type=float, default=0.3,
                         help='ssim scene detection threshold')
-    parser.add_argument('-hw', '--hwaccel', dest='hwaccel', action='store_true', default=True,
+    parser.add_argument('-hw', '--hwaccel', dest='hwaccel', action='store_true', default=False,
                         help='enable hardware acceleration encode(require nvidia graph card)')
     parser.add_argument('-scale', '--scale', dest='scale', type=float, default=1.0,
                         help='flow scale, generally use 1.0 with 1080P and 0.5 with 4K resolution')
