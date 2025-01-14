@@ -180,7 +180,7 @@ class VideoFI_IO:
             'ffmpeg', '-y', '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-r', f'{dst_fps}',
             '-s', f'{width}x{height}',
             '-i', 'pipe:0', '-i', input_path,
-            '-map', '0:v', '-map', '1:a',
+            '-map', '0:v', '-map', '1:a?',
             '-c:v', encoder, "-movflags", "+faststart", "-pix_fmt", "yuv420p", "-qp", "16", '-preset', preset,
             '-c:a', 'aac', '-b:a', '320k', f'{output_path}'
         ]
