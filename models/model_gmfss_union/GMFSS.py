@@ -77,7 +77,7 @@ class Model:
 
         return flow01, flow10, metric0, metric1, feat_ext0, feat_ext1
 
-    def inference(self, img0, img1, reuse_things, timestep0, timestep1, rife):
+    def inference(self, img0, img1, reuse_things, timestep0, timestep1, rife, enable_mask=True):
         flow01, metric0, feat11, feat12, feat13 = reuse_things[0], reuse_things[2], reuse_things[4][0], reuse_things[4][
             1], reuse_things[4][2]
         flow10, metric1, feat21, feat22, feat23 = reuse_things[1], reuse_things[3], reuse_things[5][0], reuse_things[5][
@@ -111,33 +111,46 @@ class Model:
         Z2dd = F.interpolate(Z2t, scale_factor=0.25, mode="bilinear", align_corners=False)
         feat2t3 = warp(feat23, F2tdd, Z2dd, strMode='soft')
 
+        if isinstance(timestep0, torch.Tensor) and enable_mask:
+            # Warp the input timestep to align with the warped image
+            timestep0 = warp(timestep0, F1t, Z1t, strMode='soft')
+            timestep1 = warp(timestep1, F2t, Z2t, strMode='soft')
+
+            # Fill in the holes
+            gaps0 = warp(timestep0.clone() * 0 + 1, F1t, Z1t, strMode='soft') < 0.999
+            gaps1 = warp(timestep1.clone() * 0 + 1, F2t, Z2t, strMode='soft') < 0.999
+            invalid_mask = torch.logical_or(gaps0, gaps1)
+            timestep0[invalid_mask] = 1
+            timestep1[invalid_mask] = 1
+
+            # Create masks for swapping
+            def get_mask(c, _scale=1.0):
+                timestep0f, timestep1f = timestep0.clone(), timestep1.clone()
+                if _scale != 1.0:
+                    timestep0f = F.interpolate(timestep0f, scale_factor=_scale, mode="bilinear", align_corners=False)
+                    timestep1f = F.interpolate(timestep1f, scale_factor=_scale, mode="bilinear", align_corners=False)
+                # 25 is a hyperparameter, it was determined through experimentation.
+                # Using this mask helps reduce the artifacts when encountering scene changes.
+                _mask0 = torch.Tensor(timestep0f / timestep1f > 25).repeat(1, c, 1, 1)
+                _mask1 = torch.Tensor(timestep1f / timestep0f > 25).repeat(1, c, 1, 1)
+                return _mask0, _mask1
+
+            # Swap regions with smaller timestep in the warped images/features (Smaller timestep correspond
+            # to fewer artifacts when encountering scene changes)
+            mask0, mask1 = get_mask(3, 1)
+            I1t[mask0], I2t[mask1] = I2t[mask0], I1t[mask1]
+
+            mask0, mask1 = get_mask(64, 1)
+            feat1t1[mask0], feat2t1[mask1] = feat2t1[mask0], feat1t1[mask1]
+
+            mask0, mask1 = get_mask(128, 0.5)
+            feat1t2[mask0], feat2t2[mask1] = feat2t2[mask0], feat1t2[mask1]
+
+            mask0, mask1 = get_mask(192, 0.25)
+            feat1t3[mask0], feat2t3[mask1] = feat2t3[mask0], feat1t3[mask1]
+
         out = self.fusionnet(torch.cat([I1t, rife, I2t], dim=1), torch.cat([feat1t1, feat2t1], dim=1),
                              torch.cat([feat1t2, feat2t2], dim=1), torch.cat([feat1t3, feat2t3], dim=1))
-
-        # visualization experiment
-        # import cv2
-        # cv2.imwrite(r"E:\Work\VFI\Algorithm\FCLAFI\output\I1t.png", I1t[0].permute(1, 2, 0).cpu().numpy() * 255)
-        # cv2.imwrite(r"E:\Work\VFI\Algorithm\FCLAFI\output\I2t.png", I2t[0].permute(1, 2, 0).cpu().numpy() * 255)
-        #
-        # wtimestep0 = warp(timestep0, F1t, Z1t, strMode='soft')
-        # wtimestep1 = warp(timestep1, F2t, Z2t, strMode='soft')
-        #
-        # ones_mask0 = warp(torch.ones_like(timestep0).to(timestep0.device), F1t, Z1t, strMode='soft') < 0.999
-        # ones_mask1 = warp(torch.ones_like(timestep1).to(timestep1.device), F2t, Z2t, strMode='soft') < 0.999
-        #
-        # cv2.imwrite(r"E:\Work\VFI\Algorithm\FCLAFI\output\omask0.png", ones_mask0[0].permute(1, 2, 0).cpu().numpy() * 255)
-        # cv2.imwrite(r"E:\Work\VFI\Algorithm\FCLAFI\output\omask1.png", ones_mask1[0].permute(1, 2, 0).cpu().numpy() * 255)
-        #
-        # cv2.imwrite(r"E:\Work\VFI\Algorithm\FCLAFI\output\wot0.png", wtimestep0[0].permute(1, 2, 0).cpu().numpy() * 255)
-        # cv2.imwrite(r"E:\Work\VFI\Algorithm\FCLAFI\output\wot1.png", wtimestep1[0].permute(1, 2, 0).cpu().numpy() * 255)
-        #
-        # wtimestep0[ones_mask0] = 1
-        # wtimestep1[ones_mask1] = 1
-        #
-        # cv2.imwrite(r"E:\Work\VFI\Algorithm\FCLAFI\output\t0.png", timestep0[0].permute(1, 2, 0).cpu().numpy() * 255)
-        # cv2.imwrite(r"E:\Work\VFI\Algorithm\FCLAFI\output\t1.png", timestep1[0].permute(1, 2, 0).cpu().numpy() * 255)
-        # cv2.imwrite(r"E:\Work\VFI\Algorithm\FCLAFI\output\wt0.png", wtimestep0[0].permute(1, 2, 0).cpu().numpy() * 255)
-        # cv2.imwrite(r"E:\Work\VFI\Algorithm\FCLAFI\output\wt1.png", wtimestep1[0].permute(1, 2, 0).cpu().numpy() * 255)
 
         return torch.clamp(out, 0, 1)
 
