@@ -60,6 +60,8 @@ Usage: python infer.py -m model -i in_video -o out_video [options]...
 - hwaccel = enable hardware acceleration during encoding output video.
 - scale = flow scale factor. Decrease this value to reduce the computational difficulty of the model at higher resolutions. Generally, use 1.0 for 1080P and 0.5 for 4K resolution.
 
+**Using the VapourSynth + TensorRT version can achieve 400% acceleration. Refer to this project: [VS-DRBA](https://github.com/routineLife1/VS-DRBA).**
+
 # 👀Other Demos(BiliBili)
 
 **[Sousou no Frieren NCOP1](https://www.bilibili.com/video/BV12QsaeREmr/?share_source=copy_web&vd_source=8a8926eb0f1d5f0f1cab7529c8f51282)**
